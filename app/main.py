@@ -1,14 +1,14 @@
 from contextlib import asynccontextmanager
-from datetime import datetime, date
-from typing import List, Optional, Annotated
+from datetime import date
+from typing import List, Annotated
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 from sqlmodel import select
 
 from .db import get_session, init_db
-from .db.models import Game, Player, PlayerRatingHistory, CurrentPlayerRank, Team
+from .db.models import Game, Player, CurrentPlayerRank
 
 
 # Initialize FastAPI app
@@ -25,142 +25,126 @@ app = FastAPI(lifespan=lifespan)
 SessionDep = Annotated[Session, Depends(get_session)]
 
 
-class TeamResponse(BaseModel):
+class PlayerCreate(BaseModel):
+    player_name: str
+    player_color: str
+    active: int
+
+
+class PlayerRead(PlayerCreate):
     id: int
+
+
+class GameCreate(BaseModel):
+    game_date: date
+    game_time: str
+    result_team1: int
+    result_team2: int
+
+
+class GameRead(GameCreate):
+    id: int
+
+
+class TeamCreate(BaseModel):
+    game_id: int
     player_name: str
     team_number: int
 
 
-class GameResponse(BaseModel):
-    id: int
-    game_date: datetime.date
-    game_time: str
-    result_team1: int
-    result_team2: int
-    teams: List[TeamResponse]
+@app.post("/api/players", response_model=PlayerRead)
+def create_player(player: PlayerCreate, session: Session = Depends(get_session)):
+    new_player = Player(**player.model_dump())
+    session.add(new_player)
+    session.commit()
+    session.refresh(new_player)
+    return new_player
 
 
-class PlayerResponse(BaseModel):
-    id: int
-    player_name: str
-    last_rank: Optional[float]  # Include `last_rank` for the response
-
-    class Config:
-        orm_mode = True
-
-
-@app.get("/games", response_model=List[GameResponse])
-def get_games(session: Session = Depends(get_session)) -> List[GameResponse]:
-    games = session.execute(
-        select(Game).options(selectinload(Game.teams))
-    ).scalars().all()
-
-    return games
+@app.get("/api/players/{player_id}", response_model=PlayerRead)
+def get_player(player_id: int, session: Session = Depends(get_session)):
+    player = session.get(Player, player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return player
 
 
-@app.get("/players", response_model=List[PlayerResponse])
-def get_players_with_rank(session: Session = Depends(get_session)):
-    query = (
-        select(Player)
-        .join(CurrentPlayerRank, Player.id == CurrentPlayerRank.player_id)
-    )
-    results = session.execute(query).all()
-
-    # Transform the results into PlayerResponse objects
-
-    return results
+@app.get("/api/players", response_model=List[PlayerRead])
+def list_players(session: Session = Depends(get_session)):
+    players = session.exec(select(Player)).all()
+    return players
 
 
-@app.post("/api/players", response_model=Player)
-def create_player(player: Player):
-    pass
-
-
-@app.get("/api/players/{player_id}", response_model=Player)
-def get_player(player_id: int):
-    pass  # Retrieve player
-
-
-@app.get("/api/players", response_model=List[Player])
-def list_players(active: Optional[int] = None):
-    pass
-
-
-@app.put("/api/players/{player_id}", response_model=Player)
-def update_player(player_id: int, player: Player):
-    pass
+@app.put("/api/players/{player_id}", response_model=PlayerRead)
+def update_player(player_id: int, player: PlayerCreate, session: Session = Depends(get_session)):
+    existing_player = session.get(Player, player_id)
+    if not existing_player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    for key, value in player.model_dump().items():
+        setattr(existing_player, key, value)
+    session.commit()
+    session.refresh(existing_player)
+    return existing_player
 
 
 @app.delete("/api/players/{player_id}")
-def delete_player(player_id: int):
-    pass
+def delete_player(player_id: int, session: Session = Depends(get_session)):
+    player = session.get(Player, player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    session.delete(player)
+    session.commit()
+    return {"message": "Player deleted successfully"}
 
 
 # --- Games ---
-@app.post("/api/games", response_model=Game)
-def create_game(game: Game):
-    pass
+@app.get("/api/games", response_model=List[GameRead])
+def get_games(session: Session = Depends(get_session)) -> List[GameRead]:
+    games = session.exec(select(Game).options(selectinload(Game.teams))).all()
+    return games
 
 
-@app.get("/api/games/{game_id}", response_model=Game)
-def get_game(game_id: int):
-    pass
+@app.get("/api/players", response_model=List[PlayerRead])
+def get_players_with_rank(session: Session = Depends(get_session)):
+    query = select(Player).join(CurrentPlayerRank, Player.id == CurrentPlayerRank.player_id)
+    results = session.exec(query).all()
+    return results
 
 
-@app.get("/api/games", response_model=List[Game])
-def list_games(player_name: Optional[str] = None, date_from: Optional[date] = None, date_to: Optional[date] = None):
-    pass
+@app.post("/api/games", response_model=GameRead)
+def create_game(game: GameCreate, session: Session = Depends(get_session)):
+    new_game = Game(**game.model_dump())
+    session.add(new_game)
+    session.commit()
+    session.refresh(new_game)
+    return new_game
 
 
-@app.put("/api/games/{game_id}", response_model=Game)
-def update_game(game_id: int, game: Game):
-    pass
+@app.get("/api/games/{game_id}", response_model=GameRead)
+def get_game(game_id: int, session: Session = Depends(get_session)):
+    game = session.get(Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    return game
+
+
+@app.put("/api/games/{game_id}", response_model=GameRead)
+def update_game(game_id: int, game: GameCreate, session: Session = Depends(get_session)):
+    existing_game = session.get(Game, game_id)
+    if not existing_game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    for key, value in game.model_dump().items():
+        setattr(existing_game, key, value)
+    session.commit()
+    session.refresh(existing_game)
+    return existing_game
 
 
 @app.delete("/api/games/{game_id}")
-def delete_game(game_id: int):
-    pass
-
-
-# --- Rankings ---
-@app.get("/api/rankings", response_model=List[CurrentPlayerRank])
-def get_rankings(rank_type: str = "overall"):
-    pass
-
-
-# --- Player Statistics ---
-@app.get("/api/players/{player_id}/stats")
-def player_stats(player_id: int, rank_type: str = "overall"):
-    pass
-
-
-# --- Player Rating History ---
-@app.get("/api/players/{player_id}/ratings", response_model=List[PlayerRatingHistory])
-def player_rating_history(player_id: int, rank_type: Optional[str] = None):
-    pass
-
-
-# --- Teams ---
-@app.post("/api/teams", response_model=Team)
-def create_team(team: Team):
-    pass
-
-
-@app.get("/api/teams/{team_id}", response_model=Team)
-def get_team(team_id: int):
-    pass
-
-
-@app.get("/api/teams", response_model=List[Team])
-def list_teams():
-    pass
-
-
-@app.put("/api/teams/{team_id}", response_model=Team)
-def update_team(team_id: int, team: Team):
-    pass
-
-
-@app.delete("/api/teams/{team_id}")
-def delete_team(team_id: int):
-    pass
+def delete_game(game_id: int, session: Session = Depends(get_session)):
+    game = session.get(Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    session.delete(game)
+    session.commit()
+    return {"message": "Game deleted successfully"}
