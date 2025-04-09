@@ -23,7 +23,7 @@ class Player(SQLModel, table=True):
     player_color: str
     active: int
     rating_history: Optional[List["PlayerRatingHistory"]] = Relationship(back_populates="player")
-    rating: "CurrentPlayerRank" = Relationship(back_populates="player")
+    rating: "CurrentPlayerRank" = Relationship(back_populates="player", sa_relationship_kwargs={"uselist": False})
 
 
 class PlayerRatingHistory(SQLModel, table=True):

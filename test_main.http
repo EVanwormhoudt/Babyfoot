@@ -5,7 +5,77 @@ Accept: application/json
 
 ###
 
-GET http://127.0.0.1:8000/hello/User
+GET http://127.0.0.1:8000/api/players
+Accept: application/json
+
+###
+GET http://127.0.0.1:8000/api/players/1
+Accept: application/json
+
+###
+POST http://127.0.0.1:8000/api/players
+Content-Type: application/json
+Accept: application/json
+
+{
+  "player_name": "John Doe",
+  "player_color": "#FF5733"
+}
+
+###
+PUT http://127.0.0.1:8000/api/players/69
+Content-Type: application/json
+Accept: application/json
+
+{
+  "player_name": "Jane Doe",
+  "player_color": "#33FF57"
+}
+
+###
+DELETE http://127.0.0.1:8000/api/players/69
+Accept: application/json
+
+###
+GET http://127.0.0.1:8000/api/games
+Accept: application/json
+
+###
+GET http://127.0.0.1:8000/api/games/1
+Accept: application/json
+
+###
+
+POST http://127.0.0.1:8000/api/games
+Content-Type: application/json
+Accept: application/json
+
+{
+  "result_team1": 3,
+  "result_team2": 10,
+  "teams": [
+    {
+      "player_name": "Bertrand",
+      "team_number": 1
+    },
+    {
+      "player_name": "Eddy",
+      "team_number": 2
+    }
+  ]
+}
+
+###
+PUT http://127.0.0.1:8000/api/games/1
+Content-Type: application/json
+
+{
+  "result_team1": 5,
+  "result_team2": 10
+}
+
+###
+DELETE http://127.0.0.1:8000/api/games/3729
 Accept: application/json
 
 ###
