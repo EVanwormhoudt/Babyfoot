@@ -1,14 +1,18 @@
 from contextlib import asynccontextmanager
 from datetime import date, datetime
-from typing import List, Annotated
+from typing import List, Annotated, Literal, Optional
+from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
 from sqlmodel import select, Session
+from starlette.middleware.cors import CORSMiddleware
 
+from .consts import DEFAULT_RATING, DEFAULT_SIGMA
 from .db import get_session, init_db
 from .db.models import Game, Player, CurrentPlayerRank, Team
+from .utils import get_scope_date, get_basic_stats, get_teammate_stats, get_win_streaks
 
 
 # Initialize FastAPI app
@@ -20,8 +24,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
-DEFAULT_RATING = 1000
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # or ["*"] for dev/testing
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
@@ -44,7 +55,7 @@ class PlayerUpdate(BaseModel):
 
 
 class TeamCreate(BaseModel):
-    player_name: str
+    player_id: int
     team_number: int
 
 
@@ -61,10 +72,7 @@ class GameUpdate(BaseModel):
 
 class GameRead(GameCreate):
     id: int
-    game_time: str
-    game_date: date
-
-
+    game_timestamp: datetime
 
 
 @app.post("/api/players", response_model=PlayerRead)
@@ -83,14 +91,15 @@ def create_player(player: PlayerCreate, session: Session = Depends(get_session))
     new_player.rating = CurrentPlayerRank(
         player_id=new_player.id,
         mu_overall=DEFAULT_RATING,
-        sigma_overall=25 / 3,
+        sigma_overall=DEFAULT_SIGMA,
         mu_monthly=DEFAULT_RATING,
-        sigma_monthly=25 / 3,
+        sigma_monthly=DEFAULT_SIGMA,
         mu_yearly=DEFAULT_RATING,
-        sigma_yearly=25 / 3,
+        sigma_yearly=DEFAULT_SIGMA,
         last_updated=datetime.now()
     )
     session.add(new_player.rating)
+    session.commit()
 
     return new_player
 
@@ -121,6 +130,7 @@ def update_player(player_id: int, player: PlayerCreate, session: Session = Depen
         raise HTTPException(status_code=404, detail="Player not found")
     for key, value in player.model_dump().items():
         setattr(existing_player, key, value)
+
     session.commit()
     session.refresh(existing_player)
     return existing_player
@@ -145,19 +155,33 @@ def get_players_with_rank(session: Session = Depends(get_session)):
 
 # --- Games ---
 @app.get("/api/games", response_model=List[GameRead])
-def get_games(session: Session = Depends(get_session), number: int = 10) -> List[GameRead]:
-    games = session.exec(select(Game).options(selectinload(Game.teams)))
+def get_games(
+        session: Session = Depends(get_session),
+        scope: Optional[str] = Query("all", enum=["all", "monthly"]),
+        limit: int = Query(10, ge=1),
+        offset: int = Query(0, ge=0),
+) -> List[GameRead]:
+    stmt = select(Game).options(selectinload(Game.teams))
+
+    # Apply monthly filter
+    if scope == "monthly":
+        now = datetime.now(tz=ZoneInfo("Europe/Paris"))
+        first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        stmt = stmt.where(Game.game_timestamp >= first_of_month)
+
+    # Add pagination
+    stmt = stmt.order_by(Game.game_timestamp.desc()).offset(offset).limit(limit)
+
+    games = session.exec(stmt).all()
     return games
 
 
 @app.post("/api/games", response_model=GameRead)
 def create_game(game: GameCreate, session: Session = Depends(get_session)):
-    time = datetime.now().time()
-    date = datetime.now().date()
+    time = datetime.now(ZoneInfo("Europe/Paris"))
 
     new_game = Game(
-        game_date=date,
-        game_time=str(time),
+        game_timestamp=time,
         result_team1=game.result_team1,
         result_team2=game.result_team2,
     )
@@ -166,7 +190,7 @@ def create_game(game: GameCreate, session: Session = Depends(get_session)):
     session.refresh(new_game)
     for team in game.teams:
         new_team = Team(
-            player_name=team.player_name,
+            player_id=team.player_id,
             team_number=team.team_number,
             game_id=new_game.id
         )
@@ -204,3 +228,53 @@ def delete_game(game_id: int, session: Session = Depends(get_session)):
     session.delete(game)
     session.commit()
     return {"message": "Game deleted successfully"}
+
+
+# Mix
+@app.get("/api/players/{player_id}/history", response_model=List[GameRead])
+def get_player_games(player_id: int, session: Session = Depends(get_session)):
+    games = session.exec(
+        select(Game)
+        .join(Team, Team.game_id == Game.id)
+        .where(Team.player_id == player_id)  # or Team.player_id if you have a foreign key
+    ).all()
+    if not games:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return games
+
+
+@app.get("/api/players/leaderboard/", response_model=List[Player])
+def get_leaderboard(session: Session = Depends(get_session),
+                    leaderboard_type: Literal["monthly", "yearly", "overall"] = "monthly"
+                    ) -> List[Player]:
+    # only select player with active = true
+    players = session.exec(
+        select(Player)
+        .where(Player.active == True)
+        .options(selectinload(Player.rating))
+    ).all()
+    players.sort(key=lambda x: getattr(x.rating, f"mu_{leaderboard_type}"), reverse=True)
+    return players
+
+
+@app.get("/api/players/{player_id}/stats")
+def get_player_stats(player_id: int, scope: str = "overall", session: Session = Depends(get_session)):
+    date_filter = get_scope_date(scope)
+
+    basic = get_basic_stats(session, player_id, date_filter)
+    teammates = get_teammate_stats(session, player_id, date_filter)
+    streaks = get_win_streaks(session, player_id, date_filter)
+
+    best = max(teammates, key=lambda x: x["win_rate"], default=None)
+    worst = min(teammates, key=lambda x: x["win_rate"], default=None)
+
+    return {
+        "games_played": basic.games_played,
+        "wins": basic.wins,
+        "win_rate": basic.wins / basic.games_played if basic.games_played else 0,
+        "average_team_score": basic.avg_team_score,
+        "average_opponent_score": basic.avg_opponent_score,
+        "best_teammate": best,
+        "worst_teammate": worst,
+        **streaks
+    }

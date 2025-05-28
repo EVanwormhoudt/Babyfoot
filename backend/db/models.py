@@ -2,7 +2,9 @@ import datetime
 from dataclasses import dataclass
 from typing import Optional, List
 
+from sqlalchemy import Column, DateTime
 from sqlmodel import SQLModel, Field, Relationship
+
 
 
 class Player(SQLModel, table=True):
@@ -56,16 +58,17 @@ class Game(SQLModel, table=True):
 
     Attributes:
         id (int): Unique identifier for the game.
-        game_date (datetime.date): Date the game was played.
-        game_time (str): Time the game was played.
+        game_timestamp (datetime.datetime): Timestamp of the game.
         result_team1 (int): Score/result of team 1.
         result_team2 (int): Score/result of team 2.
         teams (List[Team]): Teams participating in the game.
     """
     __tablename__ = "games"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    game_date: datetime.date
-    game_time: str
+    id: int = Field(default=None, primary_key=True)
+    game_timestamp: Optional[datetime.datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True))
+    )
     result_team1: int
     result_team2: int
     teams: List["Team"] = Relationship(back_populates="game")
@@ -81,13 +84,13 @@ class Team(SQLModel, table=True):
     Attributes:
         id (int): Unique identifier for the team.
         game_id (int): Identifier of the game the team is participating in.
-        player_name (str): Name of the player in the team.
+        player_id (int): id of the player in the team.
         team_number (int): Team number.
     """
     __tablename__ = "teams"
     id: Optional[int] = Field(default=None, primary_key=True)
     game_id: int = Field(foreign_key="games.id")
-    player_name: str
+    player_id: int
     team_number: int
     game: Optional[Game] = Relationship(back_populates="teams")
 

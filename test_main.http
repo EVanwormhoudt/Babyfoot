@@ -41,8 +41,14 @@ GET http://127.0.0.1:8000/api/games
 Accept: application/json
 
 ###
+# 🎮 Get All Games (Paginated + Monthly)
+GET http://127.0.0.1:8000/api/games?limit=5&offset=0
+Accept: application/json
+
+###
 GET http://127.0.0.1:8000/api/games/1
 Accept: application/json
+
 
 ###
 
@@ -76,6 +82,25 @@ Content-Type: application/json
 
 ###
 DELETE http://127.0.0.1:8000/api/games/3729
+Accept: application/json
+
+###
+GET http://127.0.0.1:8000/api/players/1/history
+Accept: application/json
+
+###
+
+GET http://127.0.0.1:8000/api/players/leaderboard/
+Accept: application/json
+
+###
+
+GET http://127.0.0.1:8000/api/players/1/stats
+Accept: application/json
+
+###
+# 📊 Player Stats (Yearly Scope)
+GET http://127.0.0.1:8000/api/players/1/stats?scope=yearly
 Accept: application/json
 
 ###

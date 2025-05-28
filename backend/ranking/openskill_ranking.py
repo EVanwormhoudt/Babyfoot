@@ -1,3 +1,4 @@
+# from openskill.models import BradleyTerryFull
 from openskill.models import BradleyTerryFull
 
 from ..db.models import Game, Player, Rating
@@ -8,7 +9,7 @@ def calculate_new_scores(
         team1: list[Player],
         team2: list[Player]
 ):
-    model = BradleyTerryFull()
+    model = BradleyTerryFull(margin=2)
     scores = {}
     for rating_type in ["overall", "monthly", "yearly"]:
         # Dynamically construct the attribute names for mu and sigma
