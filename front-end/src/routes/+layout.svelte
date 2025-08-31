@@ -1,9 +1,11 @@
 <script lang="ts">
     import { Menubar, MenubarMenu, MenubarTrigger, MenubarContent } from '$lib/components/ui/menubar';
     import '../app.css';
-    let { children } = $props();
     import { ModeWatcher } from "mode-watcher";
-</script>
+    import {Toaster} from "svelte-sonner";
+    let { children } = $props<{
+        data: { playersLite: { id: number; player_name: string; player_color: string }[] }
+    }>();</script>
 
 
 
@@ -18,8 +20,9 @@
     </Menubar>
 </div>
 
+
 <ModeWatcher />
 
-
+<Toaster position="top-center" theme="system" richColors />
 
 {@render children()}

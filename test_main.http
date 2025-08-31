@@ -61,12 +61,14 @@ Accept: application/json
   "result_team2": 10,
   "teams": [
     {
+      "player_id": 1,
       "player_name": "Bertrand",
       "team_number": 1
     },
     {
       "player_name": "Eddy",
-      "team_number": 2
+      "team_number": 2,
+      "player_id": 2
     }
   ]
 }

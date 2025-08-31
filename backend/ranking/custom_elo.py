@@ -2,7 +2,7 @@ import datetime
 import math
 from typing import List
 
-from app.db.models import Game, Player, CurrentPlayerRank, PlayerRatingHistory
+from ..db.models import Game, Player, CurrentPlayerRank
 
 
 # Assuming you have imported your models:
@@ -121,19 +121,6 @@ def update_all_ratings(
             player.rating.set_sigma(rating_type, new_sigma)
 
             player.rating.last_updated = datetime.datetime.now()
-
-            # Create a rating history record.
-            history = PlayerRatingHistory(
-                player_id=player.id,
-                mu=new_mu,
-                sigma=new_sigma,
-                date=game.game_date,
-                rank=int(round(new_mu)),  # Define rank as needed.
-                rank_type=rating_type
-            )
-            if player.rating_history is None:
-                player.rating_history = []
-            player.rating_history.append(history)
 
             print(
                 f"  Player {player.player_name} ({rating_type}): "
