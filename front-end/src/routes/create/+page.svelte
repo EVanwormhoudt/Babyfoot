@@ -95,6 +95,7 @@
         };
     }
 
+
     // scores as $state so updates are reactive
     let redScore = $state<number | ''>('');
     let blueScore = $state<number | ''>('');
@@ -107,11 +108,33 @@
     const API_URL = $derived(PUBLIC_API_BASE ?? '/api');
 
     let submitting = $state(false);
+    let lastGameId = $state<number | null>(null);
+
+    async function undoLastSubmission() {
+        if (!lastGameId) {
+            toast.error("Undo unavailable (no game id).");
+            return;
+        }
+        try {
+            toast.promise(
+                (async () => {
+                    const res = await fetch(`${API_URL}/api/games/${lastGameId}`, {method: "DELETE"});
+                    if (!res.ok) {
+                        const t = await res.text().catch(() => "");
+                        throw new Error(t || `Undo failed (${res.status})`);
+                    }
+                })(),
+                {loading: "Undoing…", success: "Submission undone.", error: (e) => e.message || "Failed to undo."}
+            );
+            lastGameId = null;
+        } catch { /* toast.promise handled error */
+        }
+    }
+
 
     async function submitScore() {
         const r = typeof redScore === 'number' ? redScore : Number(redScore);
         const b = typeof blueScore === 'number' ? blueScore : Number(blueScore);
-
         if (!Number.isFinite(r) || !Number.isFinite(b)) {
             toast.error("Please enter numeric scores.");
             return;
@@ -138,9 +161,12 @@
             toast.error('Blue team is empty. Drag or quick-move a player.');
             return;
         }
-
-        if (blueEmpty) {
-            toast.error('Blue team is empty. Drag or quick-move a player.');
+        if (r === b) {
+            toast.error('Scores cannot be the same.');
+            return;
+        }
+        if (r < 0 || b < 0) {
+            toast.error('Scores cannot be negative.');
             return;
         }
 
@@ -148,31 +174,36 @@
             ...redCol.items.map(i => ({ player_id: i.id, team_number: 1 })),
             ...blueCol.items.map(i => ({ player_id: i.id, team_number: 2 }))
         ];
-
         const payload: GameCreatePayload = { result_team1: r, result_team2: b, teams };
 
         submitting = true;
         try {
-                toast.promise(
-                (async () => {
-                    const res = await fetch(`${API_URL}/api/games`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(payload)
-                    });
-                    if (!res.ok) {
-                        const text = await res.text().catch(() => "");
-                        throw new Error(text || `Request failed with ${res.status}`);
-                    }
-                    const data = await res.json().catch(() => null);
-                    return data?.id ? `Game #${data.id} saved!` : "Game saved!";
-                })(),
-                {
-                    loading: "Saving match…",
-                    success: (msg) => msg,
-                    error: (err) => err.message || "Failed to save game."
+            const data = await (async () => {
+                const res = await fetch(`${API_URL}/api/games`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) {
+                    const text = await res.text().catch(() => "");
+                    throw new Error(text || `Request failed with ${res.status}`);
                 }
-            );
+                return await res.json().catch(() => ({}));
+            })();
+
+            // Show success with Undo action
+            lastGameId = Number.isFinite(Number(data?.id)) ? Number(data.id) : null;
+            toast.success(lastGameId ? `Game #${lastGameId} saved!` : "Game saved!", {
+                action: {
+                    label: "Undo",
+                    onClick: () => void undoLastSubmission()
+                },
+                // keep the toast visible a bit longer for undo
+                duration: 8000
+            });
+
+        } catch (err: any) {
+            toast.error(err?.message || "Failed to save game.");
         } finally {
             submitting = false;
         }

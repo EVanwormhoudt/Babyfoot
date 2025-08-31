@@ -51,7 +51,7 @@ export async function getPlayerHistory(id: number, eventFetch?: F) {
 
 export async function getLeaderboard(type: 'monthly' | 'yearly' | 'overall' = 'monthly', eventFetch?: F) {
     const f = eventFetch ?? fetch;
-    const res = await f(`${PUBLIC_API_BASE}/api/players/leaderboard/?leaderboard_type=${type}`);
+    const res = await f(`${PUBLIC_API_BASE}/api/players/leaderboard?leaderboard_type=${type}`);
     return res.json();
 }
 
