@@ -1,11 +1,10 @@
 <script lang="ts">
-    import { dndzone } from 'svelte-dnd-action';
-    import { Input } from '$lib/components/ui/input';
-    import { Button } from '$lib/components/ui/button';
-    import * as Card from "$lib/components/ui/card/index.js";
-    import { Label } from "$lib/components/ui/label/index.js";
-    import { PUBLIC_API_BASE } from "$env/static/public";
-    import { toast } from "svelte-sonner";
+    import {dndzone} from 'svelte-dnd-action';
+    import {Input} from '$lib/components/ui/input';
+    import {Button} from '$lib/components/ui/button';
+    import {Label} from "$lib/components/ui/label/index.js";
+    import {PUBLIC_API_BASE} from "$env/static/public";
+    import {toast} from "svelte-sonner";
 
     type PlayerLite = { id: number; player_name: string; player_color: string; active: boolean };
     type DndItem = { id: number; name: string; color?: string };
@@ -135,6 +134,11 @@
             toast.error('Red team is empty. Drag or quick-move a player.');
             return;
         }
+        if (blueEmpty) {
+            toast.error('Blue team is empty. Drag or quick-move a player.');
+            return;
+        }
+
         if (blueEmpty) {
             toast.error('Blue team is empty. Drag or quick-move a player.');
             return;
