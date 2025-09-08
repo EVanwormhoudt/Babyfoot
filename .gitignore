@@ -163,3 +163,4 @@ cython_debug/
 !/.idea/
 
 
+/front-end/src/lib/components/ui/
