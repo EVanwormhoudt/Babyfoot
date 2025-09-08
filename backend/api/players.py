@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import zoneinfo
 from datetime import datetime
-from typing import List, Literal, Optional,Dict
+from typing import List, Literal, Optional, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import selectinload
@@ -9,7 +10,7 @@ from sqlmodel import Session, select
 from sqlalchemy import func, case, and_
 
 from ..consts import DEFAULT_RATING, DEFAULT_SIGMA
-from ..db.models import Player, CurrentPlayerRank, Team, Game
+from ..db.models import Player, CurrentPlayerRank, Team, Game, PlayerRatingHistory
 from ..db.session import get_session
 from ..schemas import PlayerCreate, PlayerRead, PlayerUpdate, PlayerLeaderboard
 from ..settings import settings
@@ -18,12 +19,28 @@ router = APIRouter()
 
 
 @router.get("/leaderboard", response_model=List[PlayerLeaderboard])
+@router.get("/leaderboard", response_model=List[PlayerLeaderboard])
 def get_leaderboard(
-        leaderboard_type: Literal["monthly", "yearly", "overall"] = "monthly",
+        leaderboard_type: Literal["monthly", "yearly", "overall"] = Query("monthly"),
+        year: Optional[int] = Query(
+            None,
+            description="Year to filter by (used for 'monthly' and 'yearly'). Defaults to current year.",
+        ),
+        month: Optional[int] = Query(
+            None,
+            ge=1,
+            le=12,
+            description="Month (1..12). Only used for 'monthly'. Defaults to current month.",
+        ),
         session: Session = Depends(get_session),
 ):
-    # 1) Figure out the time window
-    start_dt, end_dt = period_bounds(leaderboard_type)
+    from sqlalchemy.orm import aliased  # local import so you don't need to modify globals
+
+    # 1) Figure out the time window (using provided year/month if applicable)
+    try:
+        start_dt, end_dt = period_bounds(leaderboard_type, year=year, month=month)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
     # 2) Build win/loss CASE expressions
     win_case = case(
@@ -36,11 +53,6 @@ def get_leaderboard(
         (and_(Team.team_number == 2, Game.result_team2 < Game.result_team1), 1),
         else_=0,
     )
-    # If you want draws:
-    # draw_case = case(
-    #     (Game.result_team1 == Game.result_team2, 1),
-    #     else_=0,
-    # )
 
     # 3) Aggregate wins/losses per player in the selected period
     stats_stmt = (
@@ -48,50 +60,100 @@ def get_leaderboard(
             Team.player_id.label("player_id"),
             func.coalesce(func.sum(win_case), 0).label("wins"),
             func.coalesce(func.sum(loss_case), 0).label("losses"),
-            # func.coalesce(func.sum(draw_case), 0).label("draws"),
         )
+        .select_from(Team)
         .join(Game, Game.id == Team.game_id)
     )
+
     if start_dt is not None and end_dt is not None:
+        # end is exclusive
         stats_stmt = stats_stmt.where(
             Game.game_timestamp >= start_dt,
             Game.game_timestamp < end_dt,
             )
-    stats_stmt = stats_stmt.group_by(Team.player_id)
 
+    stats_stmt = stats_stmt.group_by(Team.player_id)
     stats_rows = session.exec(stats_stmt).all()
     per_player_stats: Dict[int, dict] = {
-        r.player_id: {"wins": r.wins or 0, "losses": r.losses or 0} for r in stats_rows
+        r.player_id: {"wins": int(r.wins or 0), "losses": int(r.losses or 0)} for r in stats_rows
     }
 
-    # 4) Load active players with their current rating
-    players = session.exec(
-        select(Player)
-        .where(Player.active == True)
-        .options(selectinload(Player.rating))
-    ).all()
+    # 4) Load players with the correct rating snapshot
+    use_live = is_current_period(leaderboard_type, start_dt, end_dt)
 
-    # 5) Sort by the requested rating (fallback 0.0 if missing)
-    players.sort(
-        key=lambda x: getattr(x.rating, f"mu_{leaderboard_type}") if x.rating else 0.0,
-        reverse=True,
-    )
+    if use_live or leaderboard_type == "overall":
+        # Live / overall: use CurrentPlayerRank relationship
+        players_live: List[Player] = session.exec(
+            select(Player)
+            .where(Player.active == True)
+            .options(selectinload(Player.rating))
+        ).all()
+        rows = [(p, None) for p in players_live]  # normalize shape to (Player, hist)
+    else:
+        # Historical snapshot: pick the latest PlayerRatingHistory *within [start_dt, end_dt)*
+        PH = aliased(PlayerRatingHistory)
+        ph_sub = (
+            select(
+                PlayerRatingHistory.player_id.label("player_id"),
+                func.max(PlayerRatingHistory.date).label("last_ts"),
+            )
+            .where(
+                PlayerRatingHistory.rank_type == leaderboard_type,
+                PlayerRatingHistory.date >= start_dt,
+                PlayerRatingHistory.date < end_dt,  # end exclusive
+            )
+            .group_by(PlayerRatingHistory.player_id)
+            .subquery()
+        )
+
+        rows = session.exec(
+            select(Player, PH)
+            .join(ph_sub, ph_sub.c.player_id == Player.id, isouter=True)
+            .join(
+                PH,
+                and_(
+                    PH.player_id == Player.id,
+                    PH.date == ph_sub.c.last_ts,
+                    PH.rank_type == leaderboard_type,
+                    ),
+                isouter=True,
+            )
+            .where(Player.active == True)
+        ).all()  # rows: List[Tuple[Player, PlayerRatingHistory|None]]
+
+    # 5) Helpers to compute mu and sort
+    def mu_for(row) -> float:
+        p, hist = row
+        if use_live or leaderboard_type == "overall":
+            return getattr(p.rating, f"mu_{leaderboard_type}", 0.0) if p.rating else 0.0
+        else:
+            return float(hist.mu) if hist and hist.mu is not None else 0.0
+
+    def wins_for(player_id: int) -> int:
+        return per_player_stats.get(player_id, {}).get("wins", 0)
+
+    # Sort by rating desc, then wins desc, then player_id asc for stability
+    rows.sort(key=lambda r: (mu_for(r), wins_for(r[0].id), -r[0].id), reverse=True)
 
     # 6) Build response rows with wins/losses injected
     result: List[PlayerLeaderboard] = []
-    for p in players:
+    for p, hist in rows:
         stats = per_player_stats.get(p.id, {"wins": 0, "losses": 0})
+        mu_val = mu_for((p, hist))
         result.append(
             PlayerLeaderboard(
                 **p.model_dump(),
-                rating=p.rating,
-                wins=stats.get("wins", 0),
-                games_played=stats.get("wins", 0) + stats.get("losses", 0),
+                rating=p.rating if (use_live or leaderboard_type == "overall") else None,
+                mu=mu_val,
+                wins=stats["wins"],
+                games_played=stats["wins"] + stats["losses"],
+                # losses=stats["losses"],  # include if your schema supports it
             )
         )
 
-
     return result
+
+
 
 @router.post("", response_model=PlayerRead, status_code=201)
 def create_player(payload: PlayerCreate, session: Session = Depends(get_session)):
@@ -167,21 +229,50 @@ def delete_player(player_id: int, session: Session = Depends(get_session)):
     return None
 
 
+def period_bounds(
+        leaderboard_type: Literal["monthly", "yearly", "overall"],
+        *,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+) -> tuple[Optional[datetime], Optional[datetime]]:
+    """
+    Returns [start, end) bounds (end exclusive) for the requested period.
+    - overall: (None, None)
+    - yearly: [Jan 1 yyyy, Jan 1 yyyy+1)
+    - monthly: [1st of (yyyy, mm), 1st of next month)
+    Defaults: current year/month if not provided.
+    """
+    # paris tz
+    tzinfo = zoneinfo.ZoneInfo("Europe/Paris")
+    if leaderboard_type == "overall":
+        return None, None
 
-
-def period_bounds(leaderboard_type: str) -> tuple[Optional[datetime.datetime], Optional[datetime.datetime]]:
     now = datetime.now()
-    if leaderboard_type == "monthly":
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        # first day of next month
-        if start.month == 12:
-            end = start.replace(year=start.year+1, month=1)
-        else:
-            end = start.replace(month=start.month+1)
-        return start, end
+    y = year or now.year
+
     if leaderboard_type == "yearly":
-        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        end = start.replace(year=start.year+1)
+        start = datetime(y, 1, 1, tzinfo=tzinfo)
+        end = datetime(y + 1, 1, 1, tzinfo=tzinfo)
         return start, end
-    # overall: no bounds
-    return None, None
+
+    # monthly
+    m = month or now.month
+    if not 1 <= m <= 12:
+        raise ValueError("month must be in 1..12")
+
+    start = datetime(y, m, 1, tzinfo=tzinfo)
+    if m == 12:
+        end = datetime(y + 1, 1, 1, tzinfo=tzinfo)
+    else:
+        end = datetime(y, m + 1, 1, tzinfo=tzinfo)
+    return start, end
+
+def is_current_period(
+        leaderboard_type: Literal["monthly", "yearly", "overall"],
+        start_dt: Optional[datetime],
+        end_dt: Optional[datetime],
+) -> bool:
+    if leaderboard_type == "overall":
+        return True
+    now = datetime.now(start_dt.tzinfo if start_dt else None)
+    return (start_dt is not None) and (end_dt is not None) and (start_dt <= now < end_dt)

@@ -40,6 +40,7 @@ class PlayerRead(PlayerCreate):
 class PlayerLeaderboard(PlayerRead):
     wins: int
     games_played: int
+    mu: float
 
 
 # ---- Team ----
@@ -51,6 +52,7 @@ class TeamCreate(BaseModel):
 class TeamRead(BaseModel):
     player_id: int
     team_number: Literal[1, 2]
+    player: PlayerRead
 
     model_config = ConfigDict(from_attributes=True)
 

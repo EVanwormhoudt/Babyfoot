@@ -1,7 +1,9 @@
 // src/lib/api/players.ts
 import {PUBLIC_API_BASE} from '$env/static/public';
 
-type F = typeof fetch;
+export type Scope = 'monthly' | 'yearly' | 'overall';
+export type F = typeof fetch;
+export type LeaderboardOpts = { year?: number; month?: number };
 
 export async function getPlayers(eventFetch?: F) {
     const f = eventFetch ?? fetch;
@@ -49,9 +51,28 @@ export async function getPlayerHistory(id: number, eventFetch?: F) {
     return res.json();
 }
 
-export async function getLeaderboard(type: 'monthly' | 'yearly' | 'overall' = 'monthly', eventFetch?: F) {
-    const f = eventFetch ?? fetch;
-    const res = await f(`${PUBLIC_API_BASE}/api/players/leaderboard?leaderboard_type=${type}`);
+
+export async function getLeaderboard(
+    type: Scope = 'monthly',
+    optsOrFetch?: LeaderboardOpts | F,
+    maybeFetch?: F
+) {
+    const opts: LeaderboardOpts =
+        typeof optsOrFetch === 'function' ? {} : (optsOrFetch ?? {});
+    const f: F =
+        typeof optsOrFetch === 'function' ? (optsOrFetch as F) : (maybeFetch ?? fetch);
+
+    const params = new URLSearchParams({leaderboard_type: type});
+
+    if (typeof opts.year === 'number' && Number.isFinite(opts.year)) {
+        params.set('year', String(opts.year));
+    }
+    if (type === 'monthly' && typeof opts.month === 'number' && opts.month >= 1 && opts.month <= 12) {
+        params.set('month', String(opts.month));
+    }
+
+    const res = await f(`${PUBLIC_API_BASE}/api/players/leaderboard?${params.toString()}`);
+    if (!res.ok) throw new Error(`Failed to load leaderboard: ${res.status}`);
     return res.json();
 }
 

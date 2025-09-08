@@ -22,7 +22,12 @@ def get_games(
         limit: int = Query(10, ge=1, le=200),
         offset: int = Query(0, ge=0),
 ) -> List[GameRead]:
-    stmt = select(Game).options(selectinload(Game.teams))
+    stmt = (
+        select(Game)
+        .options(
+            selectinload(Game.teams).selectinload(Team.player)  # load players for each team
+        )
+    )
 
     if scope == "monthly":
         now = settings.tz

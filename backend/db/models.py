@@ -2,7 +2,7 @@ import datetime
 from dataclasses import dataclass
 from typing import Optional, List
 
-from sqlalchemy import Column, DateTime
+from sqlalchemy import Column, DateTime, UniqueConstraint, Index
 from sqlmodel import SQLModel, Field, Relationship
 
 
@@ -20,36 +20,31 @@ class Player(SQLModel, table=True):
         rating (CurrentPlayerRank): Current ranking of the player.
     """
     __tablename__ = "players"
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(default=None, primary_key=True)
     player_name: str
     player_color: str
     active: int
     rating_history: Optional[List["PlayerRatingHistory"]] = Relationship(back_populates="player")
     rating: "CurrentPlayerRank" = Relationship(back_populates="player", sa_relationship_kwargs={"uselist": False})
-
+    teams: List["Team"] = Relationship(back_populates="player")   # <-- this is the ONLY Team-related rel on Player
 
 class PlayerRatingHistory(SQLModel, table=True):
-    """
-    Stores the rating history of players.
-
-    Attributes:
-        update_id (int): Unique identifier for the rating update.
-        player_id (int): Identifier of the player.
-        mu (int): Mean rating value.
-        sigma (int): Standard deviation of the rating.
-        date (datetime.date): Date of the rating update.
-        rank (int): Player's rank at the time of update.
-        rank_type (str): Type of ranking (e.g., monthly, yearly).
-    """
     __tablename__ = "players_rating_history"
+    __table_args__ = (
+        UniqueConstraint("player_id", "rank_type", "date",
+                         name="uq_prh_player_type_date"),
+        Index("ix_prh_player_type_date", "player_id", "rank_type", "date"),
+    )
+
     update_id: Optional[int] = Field(default=None, primary_key=True)
     player_id: int = Field(foreign_key="players.id")
     mu: Optional[float]
     sigma: Optional[float]
-    date: datetime.date
+    date: datetime.date  # switch to datetime if you need more precision
     rank: int
     rank_type: str
-    player: Optional[Player] = Relationship(back_populates="rating_history")
+    player: Optional["Player"] = Relationship(back_populates="rating_history")
+
 
 
 class Game(SQLModel, table=True):
@@ -90,9 +85,10 @@ class Team(SQLModel, table=True):
     __tablename__ = "teams"
     id: Optional[int] = Field(default=None, primary_key=True)
     game_id: int = Field(foreign_key="games.id")
-    player_id: int
+    player_id: int = Field(foreign_key="players.id")
     team_number: int
     game: Optional[Game] = Relationship(back_populates="teams")
+    player: Optional[Player] = Relationship(back_populates="teams")
 
     class Config:
         arbitrary_types_allowed = True
