@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -21,6 +22,8 @@ def get_games(
         scope: Optional[str] = Query("all", enum=["all", "monthly"]),
         limit: int = Query(10, ge=1, le=200),
         offset: int = Query(0, ge=0),
+        start_date: Optional[datetime] = Query(None, description="Filter games starting from this date"),
+        end_date: Optional[datetime] = Query(None, description="Filter games up to this date"),
 ) -> List[GameRead]:
     stmt = (
         select(Game)
@@ -30,11 +33,15 @@ def get_games(
     )
 
     if scope == "monthly":
-        now = settings.tz
-        # first day of month at midnight
-        from datetime import datetime
-        first_of_month = datetime.now(tz=settings.tz).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        first_of_month = datetime.now(tz=settings.tz).replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
         stmt = stmt.where(Game.game_timestamp >= first_of_month)
+
+    if start_date:
+        stmt = stmt.where(Game.game_timestamp >= start_date)
+    if end_date:
+        stmt = stmt.where(Game.game_timestamp <= end_date)
 
     stmt = stmt.order_by(Game.game_timestamp.desc()).offset(offset).limit(limit)
     games = session.exec(stmt).all()

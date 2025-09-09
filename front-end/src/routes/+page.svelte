@@ -13,7 +13,7 @@
     };
 
     // ——— Helpers for matches, using your actual shape ———
-    const teamPlayers = (g: GameRead, n: 1 | 2): Player[] =>
+    const teamPlayers = (g: GameRead, n: 1 | 2): (Player | undefined)[] =>
         g?.teams?.filter((t) => t.team_number === n).map((t) => t.player) ?? [];
 
     const nameOf = (p: Player) => p?.player_name ?? '—';

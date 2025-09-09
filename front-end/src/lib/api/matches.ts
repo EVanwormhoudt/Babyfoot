@@ -1,12 +1,29 @@
 import {PUBLIC_API_BASE} from '$env/static/public';
 
-export async function getGames(scope = 'all', limit = 10, offset = 0) {
+export async function getGames({
+                                   scope = 'all',
+                                   limit = 10,
+                                   offset = 0,
+                                   start_date,
+                                   end_date
+                               }: {
+    scope?: 'all' | 'monthly';
+    limit?: number;
+    offset?: number;
+    start_date?: string;
+    end_date?: string;
+}) {
     const url = new URL(`${PUBLIC_API_BASE}/api/games`);
-    url.searchParams.append('scope', scope);
-    url.searchParams.append('limit', limit.toString());
-    url.searchParams.append('offset', offset.toString());
-    const res = await fetch(url);
-    return res.json();
+    url.searchParams.set('scope', scope);
+    url.searchParams.set('limit', String(limit));
+    url.searchParams.set('offset', String(offset));
+    if (start_date) url.searchParams.set('start_date', start_date);
+    if (end_date) url.searchParams.set('end_date', end_date);
+
+
+    const res = await fetch(url, {headers: {'accept': 'application/json'}});
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    return res.json(); // List[GameRead]
 }
 
 export async function createGame(data: any) {
