@@ -6,8 +6,6 @@
     import {PUBLIC_API_BASE} from "$env/static/public";
     import {toast} from "svelte-sonner";
 
-    // prettier-ignore
-
     type PlayerLite = { id: number; player_name: string; player_color: string; active: boolean };
     type DndItem = { id: number; name: string; color?: string };
 
