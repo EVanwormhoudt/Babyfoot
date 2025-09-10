@@ -1,5 +1,7 @@
 <script lang="ts">
     import {goto} from "$app/navigation";
+    import * as Select from "$lib/components/ui/select/index.js";
+    import * as Table from "$lib/components/ui/table/index.js";
 
     let {data} = $props<{
         data: {

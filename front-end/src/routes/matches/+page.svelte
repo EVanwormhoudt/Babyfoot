@@ -7,6 +7,9 @@
     import {cn} from "$lib/utils";
     import {buttonVariants} from "$lib/components/ui/button";
     import {RangeCalendar} from "$lib/components/ui/range-calendar";
+    import * as Popover from "$lib/components/ui/popover";
+    import CalendarIcon from "@lucide/svelte/icons/calendar";
+
     // --- Types ---
     const {data} = $props<{
         data: PageData & {
@@ -17,6 +20,7 @@
             toParam?: string | null; // YYYY-MM-DD
         };
     }>();
+    console.log("Matches page data:", data.matches);
 
     // --- Helpers to map your provided data shape ---
     const getDate = (g: any) => g.game_timestamp as string | undefined;
@@ -134,7 +138,7 @@
                                 <div class="mt-2 flex justify-end gap-2 px-2 pb-2">
                                     <button
                                             class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1 text-sm hover:bg-slate-700"
-                                            on:click={() => {
+                                            onclick={() => {
                       value = { start: undefined, end: undefined } ;
                       startValue = undefined;
                       applyRangeToQuery(value);
@@ -152,7 +156,6 @@
 
         <div class="mb-4 flex items-center justify-between">
             <p class="text-sm text-slate-400">
-                Showing <span class="font-medium text-slate-200">{data.items.length}</span>
                 {#if data.fromParam || data.toParam}
                     for
                     <span class="font-medium text-slate-200">
@@ -165,16 +168,16 @@
 
             <nav aria-label="Pagination" class="hidden items-center gap-2 sm:flex">
                 <button class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1 text-sm disabled:opacity-40 hover:bg-slate-700"
-                        disabled={data.page === 1} on:click={() => goPage(1)}>
+                        disabled={data.page === 1} onclick={() => goPage(1)}>
                     « First
                 </button>
                 <button class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1 text-sm disabled:opacity-40 hover:bg-slate-700"
-                        disabled={data.page === 1} on:click={() => goPage(data.page - 1)}>
+                        disabled={data.page === 1} onclick={() => goPage(data.page - 1)}>
                     ‹ Prev
                 </button>
                 <span class="text-sm text-slate-400">Page {data.page}</span>
                 <button class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1 text-sm disabled:opacity-40 hover:bg-slate-700"
-                        disabled={!data.hasNext} on:click={() => goPage(data.page + 1)}>
+                        disabled={!data.hasNext} onclick={() => goPage(data.page + 1)}>
                     Next ›
                 </button>
             </nav>
@@ -241,15 +244,15 @@
         <div class="mt-8 flex flex-col items-center justify-between gap-3 sm:flex-row">
             <nav aria-label="Pagination" class="flex items-center gap-2">
                 <button class="rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm disabled:opacity-40 hover:bg-slate-700"
-                        disabled={data.page === 1} on:click={() => goPage(1)}>« First
+                        disabled={data.page === 1} onclick={() => goPage(1)}>« First
                 </button>
                 <button class="rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm disabled:opacity-40 hover:bg-slate-700"
-                        disabled={data.page === 1} on:click={() => goPage(data.page - 1)}>‹ Prev
+                        disabled={data.page === 1} onclick={() => goPage(data.page - 1)}>‹ Prev
                 </button>
                 <span class="text-sm text-slate-400">Page <span
                         class="font-medium text-slate-200">{data.page}</span></span>
                 <button class="rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm disabled:opacity-40 hover:bg-slate-700"
-                        disabled={!data.hasNext} on:click={() => goPage(data.page + 1)}>Next ›
+                        disabled={!data.hasNext} onclick={() => goPage(data.page + 1)}>Next ›
                 </button>
             </nav>
             <div class="text-sm text-slate-400">

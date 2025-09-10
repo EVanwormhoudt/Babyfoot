@@ -5,6 +5,7 @@
     import {Label} from "$lib/components/ui/label/index.js";
     import {PUBLIC_API_BASE} from "$env/static/public";
     import {toast} from "svelte-sonner";
+    import * as Card from "$lib/components/ui/card/index.js";
 
     type PlayerLite = { id: number; player_name: string; player_color: string; active: boolean };
     type DndItem = { id: number; name: string; color?: string };

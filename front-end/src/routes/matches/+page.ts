@@ -48,6 +48,5 @@ export const load: PageLoad = async ({url}) => {
     const items = await getGames({scope, limit, offset, start_date, end_date});
 
     const hasNext = items.length === perPage;
-    console.log('Loaded matches:', {items, page, perPage, dateParam, monthParam, hasNext});
     return {matches: items, page, perPage, dateParam, monthParam, hasNext};
 };
