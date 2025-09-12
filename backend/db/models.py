@@ -25,7 +25,8 @@ class Player(SQLModel, table=True):
     player_color: str
     active: int
     rating_history: Optional[List["PlayerRatingHistory"]] = Relationship(back_populates="player")
-    rating: "CurrentPlayerRank" = Relationship(back_populates="player", sa_relationship_kwargs={"uselist": False})
+    rating: Optional["CurrentPlayerRank"] = Relationship(back_populates="player",
+                                                         sa_relationship_kwargs={"uselist": False})
     teams: List["Team"] = Relationship(back_populates="player")   # <-- this is the ONLY Team-related rel on Player
 
 class PlayerRatingHistory(SQLModel, table=True):
