@@ -4,19 +4,21 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from ..db.models import Game, Team, Player
 from ..db.session import get_session
 from ..ranking import update_all_ratings
-from ..schemas import GameCreate, GameRead, GameUpdate
+from ..schemas import GameCreate, GameRead, GameUpdate, GamesList
 from ..settings import settings
+
 
 router = APIRouter()
 
 
-@router.get("", response_model=List[GameRead])
+@router.get("", response_model=GamesList)
 def get_games(
         session: Session = Depends(get_session),
         scope: Optional[str] = Query("all", enum=["all", "monthly"]),
@@ -24,7 +26,7 @@ def get_games(
         offset: int = Query(0, ge=0),
         start_date: Optional[datetime] = Query(None, description="Filter games starting from this date"),
         end_date: Optional[datetime] = Query(None, description="Filter games up to this date"),
-) -> List[GameRead]:
+) -> GamesList:
     stmt = (
         select(Game)
         .options(
@@ -45,7 +47,19 @@ def get_games(
 
     stmt = stmt.order_by(Game.game_timestamp.desc()).offset(offset).limit(limit)
     games = session.exec(stmt).all()
-    return games
+
+    count_stmt = select(func.count()).select_from(Game)
+    if scope == "monthly":
+        first_of_month = datetime.now(tz=settings.tz).replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        count_stmt = count_stmt.where(Game.game_timestamp >= first_of_month)
+    if start_date:
+        count_stmt = count_stmt.where(Game.game_timestamp >= start_date)
+    if end_date:
+        count_stmt = count_stmt.where(Game.game_timestamp <= end_date)
+    number_of_games = session.exec(count_stmt).one()
+    return {"items": games, "total": number_of_games}
 
 
 def _validate_game_payload(payload: GameCreate):

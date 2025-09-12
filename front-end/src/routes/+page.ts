@@ -42,9 +42,14 @@ export type LeaderboardRow = {
 
 export const load: PageLoad = async ({fetch}) => {
     // Last 5 matches
-    const games: GameRead[] = await getGames('all', 5, 0);
+    const data: { items: GameRead[]; total: number } = await getGames({
+        scope: 'all',
+        limit: 5,
+        offset: 0
+    }, fetch);
 
-    console.log('Recent games:', games[0].teams[0]);
+    let games = data.items ?? [];
+    games = games.sort((a, b) => new Date(b.game_timestamp).getTime() - new Date(a.game_timestamp).getTime());
     // Monthly leaderboard, take top 3
     const lb = await getLeaderboard('monthly', {}, fetch);
     let top3: LeaderboardRow[] = [];

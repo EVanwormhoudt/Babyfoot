@@ -79,6 +79,10 @@ class GameRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class GamesList(BaseModel):
+    items: List[GameRead]
+    total: int
+
 # ---- Stats ----
 class TeammateStat(BaseModel):
     player_id: int

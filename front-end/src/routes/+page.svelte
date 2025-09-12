@@ -48,8 +48,8 @@
         Track matches, view leaderboards, and analyze stats.
     </p>
     <div class="flex gap-3">
-        <Button as="a" href="/create" size="lg">Create Match</Button>
-        <Button as="a" href="/leaderboard" size="lg" variant="outline">View Leaderboard</Button>
+        <Button href="/create" size="lg">Create Match</Button>
+        <Button href="/leaderboard" size="lg" variant="outline">View Leaderboard</Button>
     </div>
 </section>
 

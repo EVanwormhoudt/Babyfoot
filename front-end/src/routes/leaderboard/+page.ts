@@ -24,7 +24,6 @@ export const load: PageLoad = async ({fetch, url}) => {
     // Use your imported helper
     const raw = await getLeaderboard(scope, {year, month}, fetch);
 
-    console.log('Raw leaderboard data:', raw);
     // Expecting an array of players with { player_name, active, rating: { mu_*, sigma_* } }
     const filtered = Array.isArray(raw)
         ? raw.filter((p: any) => p?.active === true)

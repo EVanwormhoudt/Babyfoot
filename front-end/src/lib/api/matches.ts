@@ -1,29 +1,37 @@
 import {PUBLIC_API_BASE} from '$env/static/public';
+import type {GameRead} from "$lib/api/types";
 
-export async function getGames({
-                                   scope = 'all',
-                                   limit = 10,
-                                   offset = 0,
-                                   start_date,
-                                   end_date
-                               }: {
-    scope?: 'all' | 'monthly';
-    limit?: number;
-    offset?: number;
-    start_date?: string;
-    end_date?: string;
-}) {
-    const url = new URL(`${PUBLIC_API_BASE}/api/games`);
-    url.searchParams.set('scope', scope);
-    url.searchParams.set('limit', String(limit));
-    url.searchParams.set('offset', String(offset));
-    if (start_date) url.searchParams.set('start_date', start_date);
-    if (end_date) url.searchParams.set('end_date', end_date);
+export type F = typeof fetch;
 
 
-    const res = await fetch(url, {headers: {'accept': 'application/json'}});
-    if (!res.ok) throw new Error(`API ${res.status}`);
-    return res.json(); // List[GameRead]
+export async function getGames(
+    params: {
+        scope?: 'all' | 'monthly';
+        limit?: number;
+        offset?: number;
+        start_date?: string;
+        end_date?: string;
+    },
+    fetcher: typeof fetch // REQUIRED: inject fetch from load
+): Promise<{ items: GameRead[]; total: number }> {
+    const f = fetcher ?? fetch; // <= SAFE DEFAULT
+
+    const qs = new URLSearchParams({
+        scope: params.scope ?? 'all',
+        limit: String(params.limit ?? 10),
+        offset: String(params.offset ?? 0),
+        ...(params.start_date ? {start_date: params.start_date} : {}),
+        ...(params.end_date ? {end_date: params.end_date} : {})
+    });
+
+    const res = await fetch(`${PUBLIC_API_BASE}/api/games?${qs.toString()}`, {
+        headers: {accept: 'application/json'}
+    });
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Failed to load games (${res.status}) ${text}`);
+    }
+    return await res.json() as { items: GameRead[]; total: number };
 }
 
 export async function createGame(data: any) {

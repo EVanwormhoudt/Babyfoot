@@ -1,223 +1,223 @@
 <script lang="ts">
-    import type {DateRange} from "bits-ui";
-    import {CalendarDate, DateFormatter, type DateValue, getLocalTimeZone, fromDate} from "@internationalized/date";
-    import {RangeCalendar} from "$lib/components/ui/range-calendar";
-    import * as Popover from "$lib/components/ui/popover";
-    import CalendarIcon from "@lucide/svelte/icons/calendar";
+    import type {PageData} from './$types';
 
-    const {data} = $props<{
-        data: {
-            items: any[];
-            page: number;
-            hasNext: boolean;
-            fromParam?: string | null;
-            toParam?: string | null;
-        };
-    }>();
+    export let data: PageData;
 
-    const getDate = (g: any) => g.game_timestamp as string | undefined;
-    const getScore = (g: any) =>
-        g.result_team1 != null && g.result_team2 != null
-            ? `${g.result_team1}–${g.result_team2}`
-            : "—";
-    const teamNames = (g: any, teamNo: number) =>
-        (g.teams || [])
-            .filter((t: any) => t.team_number === teamNo)
-            .map((t: any) => t.player?.player_name ?? "?")
-            .join(" & ") || (teamNo === 1 ? "Team 1" : "Team 2");
-    const getHome = (g: any) => teamNames(g, 1);
-    const getAway = (g: any) => teamNames(g, 2);
+    // shadcn-svelte components
+    import * as Card from "$lib/components/ui/card/index.js";
+    import {Button} from "$lib/components/ui/button/index.js";
+    import * as Select from "$lib/components/ui/select/index.js";
+    import * as Pagination from "$lib/components/ui/pagination/index.js";
+    import {RangeCalendar} from "$lib/components/ui/range-calendar/index.js";
+    import {Badge} from "$lib/components/ui/badge/index.js";
+    import * as Popover from "$lib/components/ui/popover/index.js";
+    import {goto} from "$app/navigation";
+    import {parseDate, today, getLocalTimeZone, CalendarDate, type DateValue} from "@internationalized/date";
+    import {page} from '$app/state';
 
-    const fmtDate = (iso?: string) => {
-        if (!iso) return "";
-        const d = new Date(iso);
-        return d.toLocaleDateString(undefined, {
-            weekday: "short",
-            day: "2-digit",
-            month: "short",
-            year: "numeric"
+
+    function pushRangeToUrl(r?: { start?: DateValue; end?: DateValue }) {
+        if (!r?.start || !r?.end) return;
+        const start = r.start.toString();
+        const end = r.end.toString();
+
+        // Only navigate if something actually changed (prevents loops)
+        const sp = new URLSearchParams(page.url.searchParams);
+        if (sp.get("start_date") === start && sp.get("end_date") === end) return;
+
+        sp.set("start_date", start);
+        sp.set("end_date", end);
+        sp.set("page", "1");
+        goto(`?${sp.toString()}`, {replaceState: true});
+    }
+
+    // local helpers
+    function toLocal(dt: string) {
+        const d = new Date(dt);
+        return d.toLocaleString(undefined, {
+            year: 'numeric', month: 'short', day: '2-digit',
+            hour: '2-digit', minute: '2-digit'
         });
-    };
-    const fmtTime = (iso?: string) => {
-        if (!iso) return "";
-        const d = new Date(iso);
-        return d.toLocaleTimeString(undefined, {hour: "2-digit", minute: "2-digit"});
-    };
+    }
 
-    function setParams(params: Record<string, string | null>) {
-        const u = new URL(window.location.href);
-        for (const [k, v] of Object.entries(params)) {
-            if (v == null || v === "") u.searchParams.delete(k);
-            else u.searchParams.set(k, v);
+    // build/merge query params for navigation without losing others
+    function buildQuery(updates: Record<string, string | number | undefined | null>) {
+        const u = new URLSearchParams(page.url.searchParams);
+        for (const [k, v] of Object.entries(updates)) {
+            if (v === undefined || v === null || v === '') u.delete(k);
+            else u.set(k, String(v));
         }
-        if (Object.keys(params).some((k) => k !== "page")) u.searchParams.set("page", "1");
-        window.location.search = u.searchParams.toString();
+        return u.toString();
     }
 
-    function goPage(p: number) {
-        const u = new URL(window.location.href);
-        u.searchParams.set("page", String(Math.max(1, p)));
-        window.location.search = u.searchParams.toString();
+    let range: any | undefined;
+
+    // Initialize from URL on first run (so the picker reflects current filters)
+    $: if (range?.start && range?.end) {
+        pushRangeToUrl(range);
     }
 
-    const df = new DateFormatter("en-US", {dateStyle: "medium"});
-    let value: DateRange = $state({
-        start: data.fromParam
-            ? fromDate(new Date(data.fromParam + "T00:00:00"), getLocalTimeZone())
-            : undefined,
-        end: data.toParam
-            ? fromDate(new Date(data.toParam + "T00:00:00"), getLocalTimeZone())
-            : undefined
-    });
-    let startValue: DateValue | undefined = $state(undefined);
+    async function clearDates() {
+        console.log("clearDates");
+        const sp = new URLSearchParams(page.url.searchParams);
+        sp.delete("start_date");
+        sp.delete("end_date");
+        sp.set("page", "1");
 
-    function applyRangeToQuery(v: DateRange) {
-        const from = v?.start?.toDate(getLocalTimeZone());
-        const to = v?.end?.toDate(getLocalTimeZone());
-        const yyyy_mm_dd = (d: Date) => d.toISOString().slice(0, 10);
-        setParams({
-            from: from ? yyyy_mm_dd(from) : null,
-            to: to ? yyyy_mm_dd(to) : null
-        });
+        goto(`?${sp.toString()}`, {replaceState: true});
     }
+
+    function setMonth(offset = 0) {
+        const tz = getLocalTimeZone();
+        const t = today(tz); // CalendarDate for "today" in local tz
+        const start = new CalendarDate(t.year, t.month, 1).add({months: offset});
+        const end = start.add({months: 1}).subtract({days: 1});
+        // update both the bound calendar and the URL
+        range = {start, end};
+        pushRangeToUrl(range);
+    }
+
+
+    // simple label for the trigger button
+    function labelFromRange(r?: any) {
+        if (!r?.start || !r?.end) return "Pick a date range";
+        return `${r.start.toString()} — ${r.end.toString()}`;
+    }
+
 </script>
 
-<div>
-    <div>
-        <header>
-            <div>
-                <h1>Last Matches</h1>
-                <p>Filter by date range. Pagination uses limit/offset.</p>
-            </div>
-
-            <div>
-                <div>
-                    <Popover.Root>
-                        <Popover.Trigger>
-                            <CalendarIcon/>
-                            {#if value && value.start}
-                                {#if value.end}
-                                    {df.format(value.start.toDate(getLocalTimeZone()))} -
-                                    {df.format(value.end.toDate(getLocalTimeZone()))}
-                                {:else}
-                                    {df.format(value.start.toDate(getLocalTimeZone()))}
-                                {/if}
-                            {:else if startValue}
-                                {df.format(startValue.toDate(getLocalTimeZone()))}
-                            {:else}
-                                Pick a date range
-                            {/if}
-                        </Popover.Trigger>
-                        <Popover.Content align="start">
-                            <div>
-                                <RangeCalendar
-                                        bind:value
-                                        numberOfMonths={2}
-                                        onStartValueChange={(v) => (startValue = v)}
-                                        onValueChange={applyRangeToQuery}
-                                />
-                                <div>
-                                    <button
-                                            onclick={() => {
-                                            value = { start: undefined, end: undefined };
-                                            startValue = undefined;
-                                            applyRangeToQuery(value);
-                                        }}
-                                    >
-                                        Clear
-                                    </button>
-                                </div>
-                            </div>
-                        </Popover.Content>
-                    </Popover.Root>
-                </div>
-            </div>
-        </header>
-
-        <div>
-            <p>
-                {#if data.fromParam || data.toParam}
-                    for
-                    <span>
-                        {#if data.fromParam}{new Date(data.fromParam).toLocaleDateString()}{/if}
-                        {#if data.fromParam && data.toParam} – {/if}
-                        {#if data.toParam}{new Date(data.toParam).toLocaleDateString()}{/if}
-                    </span>
-                {/if}
-            </p>
-
-            <nav aria-label="Pagination">
-                <button disabled={data.page === 1} onclick={() => goPage(1)}>« First</button>
-                <button disabled={data.page === 1} onclick={() => goPage(data.page - 1)}>‹ Prev</button>
-                <span>Page {data.page}</span>
-                <button disabled={!data.hasNext} onclick={() => goPage(data.page + 1)}>Next ›</button>
-            </nav>
-        </div>
-
-        {#if data.matches.length === 0}
-            <div>
-                No matches found for this selection.
-            </div>
-        {:else}
-            <ul>
-                {#each data.items as g}
-                    <li>
-                        <article>
-                            <header>
-                                <div>
-                                    <div>—</div>
-                                    <h3>{getHome(g)} vs {getAway(g)}</h3>
-                                </div>
-                                <div>
-                                    <div>{getScore(g)}</div>
-                                    {#if getDate(g)}
-                                        <div>{fmtTime(getDate(g))}</div>
-                                    {/if}
-                                </div>
-                            </header>
-
-                            {#if getDate(g)}
-                                <footer>
-                                    <div>
-                                        <span>
-                                            {new Date(getDate(g)).toLocaleDateString(undefined, {day: "2-digit"})}
-                                        </span>
-                                        <div>
-                                            <div>{new Date(getDate(g)).toLocaleDateString(undefined, {month: "long"})}</div>
-                                            <div>{new Date(getDate(g)).toLocaleDateString(undefined, {year: "numeric"})}</div>
-                                        </div>
-                                    </div>
-                                    <span>{fmtDate(getDate(g))}</span>
-                                </footer>
-                            {/if}
-
-                            <div>
-                                <ul>
-                                    {#each (g.teams || []) as t}
-                                        <li>
-                                            <span style={`background:${t.player?.player_color || "#9ca3af"}`}></span>
-                                            <span>{t.player?.player_name}</span>
-                                            <span>(T{t.team_number})</span>
-                                        </li>
-                                    {/each}
-                                </ul>
-                            </div>
-                        </article>
-                    </li>
-                {/each}
-            </ul>
-        {/if}
-
-        <div>
-            <nav aria-label="Pagination">
-                <button disabled={data.page === 1} onclick={() => goPage(1)}>« First</button>
-                <button disabled={data.page === 1} onclick={() => goPage(data.page - 1)}>‹ Prev</button>
-                <span>Page {data.page}</span>
-                <button disabled={!data.hasNext} onclick={() => goPage(data.page + 1)}>Next ›</button>
-            </nav>
-            <div>
-                {#if data.hasNext}More results available…{/if}
-            </div>
-        </div>
+<!-- Filters -->
+<div class="space-y-4 mb-6 mt-3 ">
+    <div class="flex items-center gap-2 justify-end mr-6 ">
+        <Popover.Root>
+            <Popover.Trigger>
+                <Button class="w-[260px] justify-start font-normal" variant="outline">
+                    {labelFromRange(range)}
+                </Button>
+            </Popover.Trigger>
+            <Popover.Content class="p-0">
+                <!-- bind:value fires as the user picks dates;
+                     our reactive block above triggers navigation when both ends exist -->
+                <RangeCalendar bind:value={range} class="rounded-md border"/>
+            </Popover.Content>
+        </Popover.Root>
+        <Button onclick={() => setMonth(0)} variant="secondary">This month</Button>
+        <Button onclick={() => setMonth(-1)} variant="ghost">Last month</Button>
+        <Button onclick={clearDates} variant="destructive">Clear</Button>
     </div>
 </div>
+
+<!-- Matches list -->
+<div class="grid gap-4 sm:grid-cols-2">
+    {#if data.items.length === 0}
+        <Card.Root>
+            <Card.Content class="py-8 text-center text-muted-foreground">
+                No matches found with the current filters.
+            </Card.Content>
+        </Card.Root>
+    {:else}
+        {#each data.items as game (game.id)}
+            {@const s1 = game.result_team1 ?? 0}
+            {@const s2 = game.result_team2 ?? 0}
+            {@const t1 = game.teams.filter((t) => t.team_number === 1)}
+            {@const t2 = game.teams.filter((t) => t.team_number === 2)}
+            {@const t1Wins = s1 > s2}
+            {@const t2Wins = s2 > s1}
+
+            <Card.Root
+                    class="relative overflow-hidden rounded-2xl border border-border/60 bg-background transition hover:shadow-lg">
+                <!-- date -->
+                <Card.Header class="items-center pb-0">
+                    <Badge variant="secondary" class="text-xs">{toLocal(game.game_timestamp)}</Badge>
+                </Card.Header>
+
+                <Card.Content class="pt-4">
+                    <!-- players flanking the score -->
+                    <div class="flex items-center justify-between gap-3">
+                        <!-- LEFT team chips (tight to score) -->
+                        <div class="flex flex-wrap gap-2 max-w-[45%] justify-end">
+                            {#each t1 as m}
+                                <Badge class="rounded-full px-3 py-1
+                        {t1Wins ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-400/25' : 'bg-muted text-foreground/80 ring-1 ring-border/50'}">
+                                    {m.player.player_name ?? `P${m.player.id}`}
+                                </Badge>
+                            {/each}
+                        </div>
+
+                        <!-- SCORE -->
+                        <div class="flex items-baseline gap-2 shrink-0">
+        <span class="text-3xl font-extrabold leading-none
+                     {t1Wins ? 'text-emerald-400' : 'text-foreground/90'}">{s1}</span>
+                            <span class="text-muted-foreground">–</span>
+                            <span class="text-3xl font-extrabold leading-none
+                     {t2Wins ? 'text-emerald-400' : 'text-foreground/90'}">{s2}</span>
+                        </div>
+
+                        <!-- RIGHT team chips (tight to score) -->
+                        <div class="flex flex-wrap gap-2 max-w-[45%]">
+                            {#each t2 as m}
+                                <Badge class="rounded-full px-3 py-1
+                        {t2Wins ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-400/25' : 'bg-muted text-foreground/80 ring-1 ring-border/50'}">
+                                    {m.player.player_name ?? `P${m.player.id}`}
+                                </Badge>
+                            {/each}
+                        </div>
+                    </div>
+                </Card.Content>
+            </Card.Root>
+
+        {/each}
+
+
+    {/if}
+</div>
+
+<!-- Pagination -->
+{#if data.pageCount > 1}
+    <div class="mt-6">
+        <Pagination.Root count={data.pageCount} page={data.page}>
+            <Pagination.Content>
+                <Pagination.Item>
+                    <a
+                            href={"?"+buildQuery({ page: Math.max(1, data.page - 1) })}
+                            aria-label="Previous page"
+                            class="px-3 py-2 rounded-md hover:bg-muted"
+                            aria-disabled={data.page === 1}
+                    >
+                        Previous
+                    </a>
+                </Pagination.Item>
+
+                {#each Array(data.pageCount) as _, i}
+                    {#if Math.abs(i + 1 - data.page) <= 2 || i === 0 || i + 1 === data.pageCount}
+                        <Pagination.Item>
+                            <a
+                                    href={"?"+buildQuery({ page: i + 1 })}
+                                    class="px-3 py-2 rounded-md hover:bg-muted {i + 1 === data.page ? 'bg-primary text-primary-foreground' : ''}"
+                                    aria-current={i + 1 === data.page ? 'page' : undefined}
+                            >
+                                {i + 1}
+                            </a>
+                        </Pagination.Item>
+                    {:else if (i === 1 && data.page > 3) || (i === data.pageCount - 2 && data.page < data.pageCount - 2)}
+                        <Pagination.Ellipsis/>
+                    {/if}
+                {/each}
+
+                <Pagination.Item>
+                    <a
+                            href={"?"+buildQuery({ page: Math.min(data.pageCount, data.page + 1) })}
+                            aria-label="Next page"
+                            class="px-3 py-2 rounded-md hover:bg-muted"
+                            aria-disabled={data.page === data.pageCount}
+                    >
+                        Next
+                    </a>
+                </Pagination.Item>
+            </Pagination.Content>
+        </Pagination.Root>
+    </div>
+{/if}
+<div class="h-6"></div>
+
+
