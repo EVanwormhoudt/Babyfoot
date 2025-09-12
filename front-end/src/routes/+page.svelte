@@ -43,13 +43,13 @@
 
 <!-- HERO -->
 <section class="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
-    <h1 class="text-5xl font-bold mb-4 tracking-tight">Welcome to Foosball Arena</h1>
+    <h1 class="text-5xl font-bold mb-4 tracking-tight">BabyFoot MyDSO</h1>
     <p class="mb-8 text-lg text-muted-foreground max-w-prose">
         Track matches, view leaderboards, and analyze stats.
     </p>
     <div class="flex gap-3">
-        <Button href="/create" size="lg">Create Match</Button>
-        <Button href="/leaderboard" size="lg" variant="outline">View Leaderboard</Button>
+        <Button href="/create" size="lg">Nouveau Match</Button>
+        <Button href="/leaderboard" size="lg" variant="outline">Voir le Classement</Button>
     </div>
 </section>
 
@@ -59,8 +59,8 @@
         <!-- Recent Matches -->
         <Card class="lg:col-span-3">
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-4">
-                <CardTitle class="text-xl">Recent Matches</CardTitle>
-                <Button as="a" class="h-8 px-2" href="/matches" variant="ghost">See all</Button>
+                <CardTitle class="text-xl">Matchs Récents</CardTitle>
+                <Button as="a" class="h-8 px-2" href="/matches" variant="ghost">Voir tous</Button>
             </CardHeader>
             <CardContent>
                 {#if data?.games?.length}
@@ -161,7 +161,7 @@
         <!-- Top 3 Leaderboard -->
         <Card class="lg:col-span-2">
             <CardHeader class="pb-4">
-                <CardTitle class="text-xl">Top Players (Monthly)</CardTitle>
+                <CardTitle class="text-xl">Top Players (du mois)</CardTitle>
             </CardHeader>
             <CardContent>
                 {#if data?.top3?.length}
@@ -197,10 +197,10 @@
 
                     <Separator class="my-4"/>
                     <div class="flex justify-end">
-                        <Button as="a" href="/leaderboard" size="sm" variant="outline">Full Leaderboard</Button>
+                        <Button as="a" href="/leaderboard" size="sm" variant="outline">Classement entier</Button>
                     </div>
                 {:else}
-                    <p class="text-sm text-muted-foreground">No leaderboard data yet.</p>
+                    <p class="text-sm text-muted-foreground">Pas encore de classement.</p>
                 {/if}
             </CardContent>
         </Card>

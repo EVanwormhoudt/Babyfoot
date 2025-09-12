@@ -279,7 +279,7 @@
                         onfinalize={(e) => handleDndFinalizeCards(column.id, e)}
                 >
                     {#each column.items as item (item.id)}
-                        <div class="relative group border-2 border-gray-300 rounded-md px-3 py-2 flex items-center justify-between cursor-grab shadow-sm hover:bg-gray-300 hover:text-black transition h-11 w-64">
+                        <div class="relative group border-1 border-gray-300 rounded-md px-3 py-2 flex items-center justify-between cursor-grab shadow-sm hover:bg-gray-300 hover:text-black transition h-11 w-64">
                             <div class="flex items-center gap-2">
 
                                 <span>{item.name}</span>
@@ -308,13 +308,13 @@
         <!-- Score Input Section -->
         <Card.Root class="w-[400px]">
             <Card.Header>
-                <Card.Title>Submit Match Score</Card.Title>
-                <Card.Description>Enter the scores for each team</Card.Description>
+                <Card.Title>Soummetre le score</Card.Title>
+                <Card.Description>Entrer le score des deux equipes</Card.Description>
             </Card.Header>
             <Card.Content>
                 <div class="flex justify-around gap-6">
                     <div class="flex flex-col items-center gap-y-2">
-                        <Label for="redScore" class="text-foreground">Red Score</Label>
+                        <Label class="text-foreground" for="redScore">Score des rouges</Label>
                         <Input id="redScore" type="number" bind:value={redScore} class="w-24" placeholder="0" max={10} min={0}/>
                     </div>
                     <div class="flex flex-col items-center">
@@ -322,7 +322,7 @@
                         <Label class="text-foreground">VS</Label>
                     </div>
                     <div class="flex flex-col items-center gap-y-2">
-                        <Label for="blueScore" class="text-foreground">Blue Score</Label>
+                        <Label class="text-foreground" for="blueScore">Score des bleus</Label>
                         <Input id="blueScore" type="number" bind:value={blueScore} class="w-24" placeholder="0" max={10} min={0}/>
                     </div>
                 </div>

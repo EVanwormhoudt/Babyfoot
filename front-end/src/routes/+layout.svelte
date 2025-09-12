@@ -14,11 +14,11 @@
 
 <div class="flex justify-center py-4 border-b">
     <Menubar class="flex gap-4 ">
-        <a href="/" class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black">Home</a>
-        <a href="/leaderboard" class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black">Leaderboard</a>
-        <a class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black" href="/matches">Matches</a>
-        <a href="/create" class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black">Create Match</a>
-        <a href="/stats" class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black">Stats</a>
+        <a class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black" href="/">Acceuil</a>
+        <a class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black" href="/leaderboard">Classement</a>
+        <a class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black" href="/matches">Matchs</a>
+        <a class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black" href="/create">Nouveau</a>
+        <!--<a  href="/stats" class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black">Stats</a> -->
     </Menubar>
 </div>
 

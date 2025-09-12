@@ -102,7 +102,7 @@
 </script>
 
 <section class="p-8">
-    <h2 class="text-3xl font-semibold mb-6">Leaderboard</h2>
+    <h2 class="text-3xl font-semibold mb-6">Classement</h2>
 
     <div class="flex flex-wrap gap-3 justify-end mb-4 datepicker">
         {#if scopeSel === "monthly"}

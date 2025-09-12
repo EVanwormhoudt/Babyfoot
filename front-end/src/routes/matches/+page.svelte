@@ -101,9 +101,9 @@
                 <RangeCalendar bind:value={range} class="rounded-md border"/>
             </Popover.Content>
         </Popover.Root>
-        <Button onclick={() => setMonth(0)} variant="secondary">This month</Button>
-        <Button onclick={() => setMonth(-1)} variant="ghost">Last month</Button>
-        <Button onclick={clearDates} variant="destructive">Clear</Button>
+        <Button onclick={() => setMonth(0)} variant="secondary">Ce mois</Button>
+        <Button onclick={() => setMonth(-1)} variant="ghost">Mois Précédent</Button>
+        <Button onclick={clearDates} variant="destructive">Effacer</Button>
     </div>
 </div>
 
@@ -112,7 +112,7 @@
     {#if data.items.length === 0}
         <Card.Root>
             <Card.Content class="py-8 text-center text-muted-foreground">
-                No matches found with the current filters.
+                Pas de matchs trouvés avec les filtres actuels.
             </Card.Content>
         </Card.Root>
     {:else}
