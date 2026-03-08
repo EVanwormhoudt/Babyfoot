@@ -124,10 +124,6 @@ def create_game(game: GameCreate, session: Session = Depends(get_session)):
         raise
     except Exception as e:
         raise HTTPException(500, f"Failed to create game: {e}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"Failed to create game: {e}")
 
 
 @router.get("/{game_id}", response_model=GameRead)
@@ -157,6 +153,9 @@ def delete_game(game_id: int, session: Session = Depends(get_session)):
     g = session.get(Game, game_id)
     if not g:
         raise HTTPException(404, "Game not found")
+    teams = session.exec(select(Team).where(Team.game_id == game_id)).all()
+    for team in teams:
+        session.delete(team)
     session.delete(g)
     session.commit()
     return None

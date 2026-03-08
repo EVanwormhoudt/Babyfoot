@@ -87,7 +87,7 @@ class GamesList(BaseModel):
 class TeammateStat(BaseModel):
     player_id: int
     player_name: str
-    games: int
+    games_played: int
     wins: int
     win_rate: float
 

@@ -1,10 +1,9 @@
 from sqlmodel import SQLModel, create_engine, Session
 
-# Database configuration
-DATABASE_URL = "postgresql://localhost:5432/babyfoot"  # Replace with your credentials
+from ..settings import settings
 
 # Create the database engine
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(settings.DATABASE_URL, echo=False)
 
 
 # Initialize the database schema (create tables if they don't exist)

@@ -5,11 +5,12 @@ from sqlalchemy.orm import aliased
 from sqlmodel import Session, select
 
 from backend.db.models import Game, Team, Player
+from backend.settings import settings
 from sqlalchemy import case, and_, or_, func
 
 
 def get_scope_date(scope: str) -> Optional[datetime.datetime]:
-    now = datetime.datetime.now(datetime.UTC)
+    now = datetime.datetime.now(tz=settings.tz)
     if scope == "monthly":
         return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     elif scope == "yearly":

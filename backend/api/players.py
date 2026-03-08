@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import zoneinfo
 from datetime import datetime
 from typing import List, Literal, Optional, Dict
 
@@ -18,7 +17,6 @@ from ..settings import settings
 router = APIRouter()
 
 
-@router.get("/leaderboard", response_model=List[PlayerLeaderboard])
 @router.get("/leaderboard", response_model=List[PlayerLeaderboard])
 def get_leaderboard(
         leaderboard_type: Literal["monthly", "yearly", "overall"] = Query("monthly"),
@@ -161,25 +159,34 @@ def create_player(payload: PlayerCreate, session: Session = Depends(get_session)
     if exists:
         raise HTTPException(status_code=400, detail="Player already exists")
 
-    p = Player(active=True, **payload.model_dump())
-    session.add(p)
-    session.commit()
-    session.refresh(p)
+    try:
+        p = Player(active=True, **payload.model_dump())
+        session.add(p)
+        session.flush()
 
-    p.rating = CurrentPlayerRank(
-        player_id=p.id,
-        mu_overall=DEFAULT_RATING,
-        sigma_overall=DEFAULT_SIGMA,
-        mu_monthly=DEFAULT_RATING,
-        sigma_monthly=DEFAULT_SIGMA,
-        mu_yearly=DEFAULT_RATING,
-        sigma_yearly=DEFAULT_SIGMA,
-        last_updated=datetime.now(tz=settings.tz),
-    )
-    session.add(p.rating)
-    session.commit()
-    session.refresh(p)
-    return p
+        session.add(
+            CurrentPlayerRank(
+                player_id=p.id,
+                mu_overall=DEFAULT_RATING,
+                sigma_overall=DEFAULT_SIGMA,
+                mu_monthly=DEFAULT_RATING,
+                sigma_monthly=DEFAULT_SIGMA,
+                mu_yearly=DEFAULT_RATING,
+                sigma_yearly=DEFAULT_SIGMA,
+                last_updated=datetime.now(tz=settings.tz),
+            )
+        )
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create player: {e}")
+
+    created = session.exec(
+        select(Player)
+        .where(Player.id == p.id)
+        .options(selectinload(Player.rating))
+    ).first()
+    return created
 
 
 @router.get("", response_model=List[PlayerRead])
@@ -224,6 +231,23 @@ def delete_player(player_id: int, session: Session = Depends(get_session)):
     p = session.get(Player, player_id)
     if not p:
         raise HTTPException(404, "Player not found")
+
+    has_games = session.exec(
+        select(Team.id).where(Team.player_id == player_id).limit(1)
+    ).first()
+    if has_games:
+        raise HTTPException(409, "Cannot delete player with game history; deactivate instead")
+
+    rank = session.get(CurrentPlayerRank, player_id)
+    if rank:
+        session.delete(rank)
+
+    history_rows = session.exec(
+        select(PlayerRatingHistory).where(PlayerRatingHistory.player_id == player_id)
+    ).all()
+    for row in history_rows:
+        session.delete(row)
+
     session.delete(p)
     session.commit()
     return None
@@ -242,12 +266,11 @@ def period_bounds(
     - monthly: [1st of (yyyy, mm), 1st of next month)
     Defaults: current year/month if not provided.
     """
-    # paris tz
-    tzinfo = zoneinfo.ZoneInfo("Europe/Paris")
+    tzinfo = settings.tz
     if leaderboard_type == "overall":
         return None, None
 
-    now = datetime.now()
+    now = datetime.now(tz=settings.tz)
     y = year or now.year
 
     if leaderboard_type == "yearly":
@@ -274,5 +297,5 @@ def is_current_period(
 ) -> bool:
     if leaderboard_type == "overall":
         return True
-    now = datetime.now(start_dt.tzinfo if start_dt else None)
+    now = datetime.now(tz=settings.tz)
     return (start_dt is not None) and (end_dt is not None) and (start_dt <= now < end_dt)
