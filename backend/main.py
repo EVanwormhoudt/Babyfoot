@@ -43,6 +43,15 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api")
 
 
+@app.get("/")
+async def root():
+    return {
+        "name": "Foosball Ratings API",
+        "health": "/healthz",
+        "docs": "/docs",
+    }
+
+
 @app.get("/healthz")
 async def healthz():
     return {"status": "ok"}
