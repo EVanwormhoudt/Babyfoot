@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import selectinload
@@ -20,7 +20,7 @@ def get_player_games(player_id: int, session: Session = Depends(get_session)):
         raise HTTPException(404, "Player not found")
     games = session.exec(
         select(Game)
-        .options(selectinload(Game.teams))
+        .options(selectinload(Game.teams).selectinload(Team.player))
         .join(Team, Team.game_id == Game.id)
         .where(Team.player_id == player_id)
         .order_by(Game.game_timestamp.desc())
@@ -29,7 +29,11 @@ def get_player_games(player_id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/{player_id}/stats", response_model=PlayerStats)
-def get_player_stats(player_id: int, scope: str = Query("overall"), session: Session = Depends(get_session)):
+def get_player_stats(
+        player_id: int,
+        scope: Literal["overall", "monthly", "yearly"] = Query("overall"),
+        session: Session = Depends(get_session),
+):
     if not session.get(Player, player_id):
         raise HTTPException(404, "Player not found")
 
