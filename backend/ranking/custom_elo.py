@@ -1,6 +1,15 @@
 import datetime as _dt
-import math
-from typing import List, Sequence, Any, Callable, Optional, Dict
+from typing import Any, Callable, Dict, List, Optional, Sequence, TYPE_CHECKING
+
+from sqlalchemy.orm import selectinload
+from sqlmodel import select
+
+from ..consts import DEFAULT_RATING, DEFAULT_SIGMA
+from ..db.models import CurrentPlayerRank, Game, Player, Team
+from ..settings import settings
+
+if TYPE_CHECKING:
+    from sqlmodel import Session
 
 
 def update_all_ratings(
@@ -171,3 +180,99 @@ def update_all_ratings(
             new = max(sigma_min, min(sigma_max, cur + K_sigma * M_sigma * (perf_err_t2 - 0.5)))
             set_s(rating_type, new)
             setattr(r, "last_updated", ts)
+
+
+def recalculate_all_ratings(session: "Session") -> None:
+    """
+    Rebuild current ratings by replaying every saved game in chronological order.
+    """
+    now = _dt.datetime.now(tz=settings.tz)
+    first_of_year = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    players = session.exec(
+        select(Player).options(selectinload(Player.rating))
+    ).all()
+
+    for player in players:
+        if player.rating is None:
+            player.rating = CurrentPlayerRank(
+                player_id=player.id,
+                mu_overall=DEFAULT_RATING,
+                sigma_overall=DEFAULT_SIGMA,
+                mu_monthly=DEFAULT_RATING,
+                sigma_monthly=DEFAULT_SIGMA,
+                mu_yearly=DEFAULT_RATING,
+                sigma_yearly=DEFAULT_SIGMA,
+                last_updated=now,
+            )
+            session.add(player.rating)
+        else:
+            player.rating.mu_overall = DEFAULT_RATING
+            player.rating.sigma_overall = DEFAULT_SIGMA
+            player.rating.mu_monthly = DEFAULT_RATING
+            player.rating.sigma_monthly = DEFAULT_SIGMA
+            player.rating.mu_yearly = DEFAULT_RATING
+            player.rating.sigma_yearly = DEFAULT_SIGMA
+            player.rating.last_updated = now
+
+    session.flush()
+
+    games = session.exec(
+        select(Game)
+        .options(
+            selectinload(Game.teams)
+            .selectinload(Team.player)
+            .selectinload(Player.rating)
+        )
+        .order_by(Game.game_timestamp.asc(), Game.id.asc())
+    ).all()
+
+    for game in games:
+        team1: list[Player] = []
+        team2: list[Player] = []
+
+        for team in game.teams:
+            player = team.player
+            if player is None:
+                raise ValueError(f"Game {game.id} references missing player_id={team.player_id}")
+            if team.team_number == 1:
+                team1.append(player)
+            elif team.team_number == 2:
+                team2.append(player)
+            else:
+                raise ValueError(f"Game {game.id} has invalid team_number={team.team_number}")
+
+        if not team1 or not team2:
+            raise ValueError(f"Game {game.id} must have players on both teams")
+
+        game_ts = game.game_timestamp
+        if game_ts is not None:
+            if game_ts.tzinfo is None:
+                game_ts = game_ts.replace(tzinfo=settings.tz)
+            else:
+                game_ts = game_ts.astimezone(settings.tz)
+
+        update_all_ratings(
+            game,
+            team1,
+            team2,
+            rating_types=["overall"],
+            timestamp_tz=settings.tz,
+        )
+        if game_ts is not None and game_ts >= first_of_year:
+            update_all_ratings(
+                game,
+                team1,
+                team2,
+                rating_types=["yearly"],
+                timestamp_tz=settings.tz,
+            )
+        if game_ts is not None and game_ts >= first_of_month:
+            update_all_ratings(
+                game,
+                team1,
+                team2,
+                rating_types=["monthly"],
+                timestamp_tz=settings.tz,
+            )
