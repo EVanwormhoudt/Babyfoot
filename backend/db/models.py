@@ -15,7 +15,7 @@ class Player(SQLModel, table=True):
         id (int): Unique identifier for the player.
         player_name (str): Name of the player.
         player_color (str): Color associated with the player.
-        active (int): Indicates whether the player is active.
+        active (bool): Indicates whether the player is active.
         rating_history (List[PlayerRatingHistory]): Historical ratings of the player.
         rating (CurrentPlayerRank): Current ranking of the player.
     """
@@ -23,7 +23,7 @@ class Player(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
     player_name: str
     player_color: str
-    active: int
+    active: bool
     rating_history: Optional[List["PlayerRatingHistory"]] = Relationship(back_populates="player")
     rating: Optional["CurrentPlayerRank"] = Relationship(back_populates="player",
                                                          sa_relationship_kwargs={"uselist": False})
