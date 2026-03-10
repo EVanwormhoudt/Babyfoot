@@ -24,9 +24,9 @@ class PlayerCreate(BaseModel):
 
 
 class PlayerUpdate(BaseModel):
-    player_name: str
-    player_color: str
-    active: bool
+    player_name: Optional[str] = None
+    player_color: Optional[str] = None
+    active: Optional[bool] = None
 
 
 class PlayerRead(PlayerCreate):
@@ -52,7 +52,7 @@ class TeamCreate(BaseModel):
 class TeamRead(BaseModel):
     player_id: int
     team_number: Literal[1, 2]
-    player: PlayerRead
+    player: Optional[PlayerRead] = None
 
     model_config = ConfigDict(from_attributes=True)
 
