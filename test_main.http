@@ -29,7 +29,8 @@ Accept: application/json
 
 {
   "player_name": "Jane Doe",
-  "player_color": "#33FF57"
+  "player_color": "#33FF57",
+  "active": true
 }
 
 ###
@@ -62,11 +63,9 @@ Accept: application/json
   "teams": [
     {
       "player_id": 1,
-      "player_name": "Bertrand",
       "team_number": 1
     },
     {
-      "player_name": "Eddy",
       "team_number": 2,
       "player_id": 2
     }
