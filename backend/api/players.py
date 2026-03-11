@@ -7,7 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 from sqlalchemy import func, case, and_
+from sqlalchemy.exc import IntegrityError
 
+from .db_errors import map_integrity_error
 from ..consts import DEFAULT_RATING, DEFAULT_SIGMA
 from ..db.models import Player, CurrentPlayerRank, Team, Game, PlayerRatingHistory
 from ..db.session import get_session
@@ -177,6 +179,9 @@ def create_player(payload: PlayerCreate, session: Session = Depends(get_session)
             )
         )
         session.commit()
+    except IntegrityError as e:
+        session.rollback()
+        raise map_integrity_error(e, "Failed to create player due to a database constraint")
     except Exception as e:
         session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create player: {e}")
@@ -219,11 +224,27 @@ def update_player(player_id: int, payload: PlayerUpdate, session: Session = Depe
     p = session.get(Player, player_id)
     if not p:
         raise HTTPException(404, "Player not found")
-    for k, v in payload.model_dump().items():
+    updates = payload.model_dump(exclude_unset=True, exclude_none=True)
+
+    if "player_name" in updates and updates["player_name"] != p.player_name:
+        exists = session.exec(
+            select(Player).where(Player.player_name == updates["player_name"], Player.id != player_id)
+        ).first()
+        if exists:
+            raise HTTPException(status_code=400, detail="Player already exists")
+
+    for k, v in updates.items():
         setattr(p, k, v)
-    session.commit()
-    session.refresh(p)
-    return p
+    try:
+        session.commit()
+    except IntegrityError as e:
+        session.rollback()
+        raise map_integrity_error(e, "Failed to update player due to a database constraint")
+
+    updated = session.exec(
+        select(Player).where(Player.id == player_id).options(selectinload(Player.rating))
+    ).first()
+    return updated
 
 
 @router.delete("/{player_id}", status_code=204)
@@ -249,7 +270,12 @@ def delete_player(player_id: int, session: Session = Depends(get_session)):
         session.delete(row)
 
     session.delete(p)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as e:
+        session.rollback()
+        raise map_integrity_error(e, "Failed to delete player due to a database constraint")
+
     return None
 
 
