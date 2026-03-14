@@ -4,6 +4,25 @@ import {PUBLIC_API_BASE} from '$env/static/public';
 export type Scope = 'monthly' | 'yearly' | 'overall';
 export type F = typeof fetch;
 export type LeaderboardOpts = { year?: number; month?: number };
+export type TeammateStat = {
+    player_id: number;
+    player_name: string;
+    games_played: number;
+    wins: number;
+    win_rate: number;
+};
+
+export type PlayerStats = {
+    games_played: number;
+    wins: number;
+    win_rate: number;
+    average_team_score: number;
+    average_opponent_score: number;
+    best_teammate?: TeammateStat | null;
+    worst_teammate?: TeammateStat | null;
+    current_win_streak: number;
+    longest_win_streak: number;
+};
 
 export async function getPlayers(eventFetch?: F) {
     const f = eventFetch ?? fetch;
@@ -79,5 +98,8 @@ export async function getLeaderboard(
 export async function getPlayerStats(id: number, scope = 'overall', eventFetch?: F) {
     const f = eventFetch ?? fetch;
     const res = await f(`${PUBLIC_API_BASE}/api/players/${id}/stats?scope=${scope}`);
-    return res.json();
+    if (!res.ok) {
+        throw new Error(`Failed to load player stats (${res.status})`);
+    }
+    return res.json() as Promise<PlayerStats>;
 }

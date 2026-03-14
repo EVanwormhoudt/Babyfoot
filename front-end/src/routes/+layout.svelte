@@ -18,7 +18,7 @@
         <a class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black" href="/leaderboard">Classement</a>
         <a class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black" href="/matches">Matchs</a>
         <a class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black" href="/create">Nouveau</a>
-        <!--<a  href="/stats" class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black">Stats</a> -->
+        <a class="px-4 py-2 hover:bg-primary rounded-md transition hover:text-black" href="/stats">Stats</a>
     </Menubar>
 </div>
 
