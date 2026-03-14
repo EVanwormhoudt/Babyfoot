@@ -5,7 +5,8 @@
     import {Button} from '$lib/components/ui/button';
     import {Card, CardContent, CardHeader, CardTitle} from '$lib/components/ui/card';
     import {Separator} from '$lib/components/ui/separator';
-    import type {GameRead, LeaderboardRow, Player} from "./+page";
+    import type {GameRead} from "$lib/api/types";
+    import type {LeaderboardRow, Player} from "./+page";
 
     export let data: {
         games: GameRead[];
@@ -13,10 +14,15 @@
     };
 
     // ——— Helpers for matches, using your actual shape ———
-    const teamPlayers = (g: GameRead, n: 1 | 2): (Player | undefined)[] =>
-        g?.teams?.filter((t) => t.team_number === n).map((t) => t.player) ?? [];
+    const teamPlayers = (g: GameRead, n: 1 | 2): Player[] =>
+        (
+            g?.teams
+                ?.filter((t) => t.team_number === n)
+                .map((t) => t.player)
+                .filter((p) => !!p) as Player[] | undefined
+        ) ?? [];
 
-    const nameOf = (p: Player) => p?.player_name ?? '—';
+    const nameOf = (p?: Player) => p?.player_name ?? '—';
 
     const scoreA = (g: GameRead) => g.result_team1 ?? 0;
     const scoreB = (g: GameRead) => g.result_team2 ?? 0;
@@ -29,14 +35,10 @@
         new Date(iso).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
 
     // ——— Helpers for leaderboard ———
-    const rowName = (r: LeaderboardRow) =>
-        r?.player_name ?? r?.name ?? r?.display_name ?? r?.username ?? 'Player';
+    const rowName = (r: LeaderboardRow) => r?.player_name ?? 'Player';
 
-    const rowRating = (r: LeaderboardRow) => r?.rating?.mu_monthly ?? r?.elo ?? r?.points ?? r?.score;
-    const rowWL = (r: LeaderboardRow) =>
-        typeof r?.wins === 'number' || typeof r?.losses === 'number'
-            ? `${r.wins ?? 0}-${r.losses ?? 0}`
-            : undefined;
+    const rowRating = (r: LeaderboardRow) => r?.mu ?? r?.rating?.mu_monthly;
+    const rowWL = (r: LeaderboardRow) => `${r.wins ?? 0}-${Math.max(0, (r.games_played ?? 0) - (r.wins ?? 0))}`;
 
 
 </script>
@@ -60,7 +62,7 @@
         <Card class="lg:col-span-3">
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-4">
                 <CardTitle class="text-xl">Matchs Récents</CardTitle>
-                <Button as="a" class="h-8 px-2" href="/matches" variant="ghost">Voir tous</Button>
+                <Button class="h-8 px-2" href="/matches" variant="ghost">Voir tous</Button>
             </CardHeader>
             <CardContent>
                 {#if data?.games?.length}
@@ -197,7 +199,7 @@
 
                     <Separator class="my-4"/>
                     <div class="flex justify-end">
-                        <Button as="a" href="/leaderboard" size="sm" variant="outline">Classement entier</Button>
+                        <Button href="/leaderboard" size="sm" variant="outline">Classement entier</Button>
                     </div>
                 {:else}
                     <p class="text-sm text-muted-foreground">Pas encore de classement.</p>
