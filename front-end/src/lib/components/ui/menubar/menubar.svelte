@@ -1,16 +1,18 @@
 <script lang="ts">
-	import { Menubar as MenubarPrimitive } from "bits-ui";
+	import type { Snippet } from "svelte";
+	import type { HTMLAttributes } from "svelte/elements";
 	import { cn } from "$lib/utils.js";
 
-	type $$Props = MenubarPrimitive.Props;
-
-	let className: $$Props["class"] = undefined;
-	export { className as class };
+	let {
+		class: className,
+		children,
+		...restProps
+	}: HTMLAttributes<HTMLDivElement> & { children?: Snippet } = $props();
 </script>
 
-<MenubarPrimitive.Root
+<div
 	class={cn("bg-background flex h-10 items-center space-x-1 rounded-md border p-1", className)}
-	{...$$restProps}
+	{...restProps}
 >
-	<slot />
-</MenubarPrimitive.Root>
+	{@render children?.()}
+</div>
