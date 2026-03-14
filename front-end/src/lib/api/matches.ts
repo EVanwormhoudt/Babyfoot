@@ -24,7 +24,7 @@ export async function getGames(
         ...(params.end_date ? {end_date: params.end_date} : {})
     });
 
-    const res = await fetch(`${PUBLIC_API_BASE}/api/games?${qs.toString()}`, {
+    const res = await f(`${PUBLIC_API_BASE}/api/games?${qs.toString()}`, {
         headers: {accept: 'application/json'}
     });
     if (!res.ok) {

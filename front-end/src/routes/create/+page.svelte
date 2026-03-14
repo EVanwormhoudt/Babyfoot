@@ -12,9 +12,7 @@
 
     // props (Svelte 5)
     let { data } = $props<{ data: { playersLite: PlayerLite[] } }>();
-
-    // players derived from props
-    const players = $derived(Array.isArray(data?.playersLite) ? data.playersLite : []);
+    const playersLite: PlayerLite[] = Array.isArray(data?.playersLite) ? data.playersLite : [];
 
     // Column IDs
     const COL_PLAYERS = 1;
@@ -29,7 +27,7 @@
             id: COL_PLAYERS,
             name: "Joueurs",
             class: "players",
-            items: players
+            items: playersLite
                 .filter((p) => p.active)
                 .map((p) => ({ id: p.id, name: p.player_name, color: p.player_color }))
         },
@@ -46,7 +44,8 @@
     const dropTargetStyle = { outline: 'rgba(255, 255, 255, 0.5) solid 2px' };
     const dropTargetStyleMain = {};
 
-    function transformDraggedElement(el: HTMLElement) {
+    function transformDraggedElement(el?: HTMLElement) {
+        if (!el) return;
         el.style.backgroundColor = '#e5e7eb';
         el.style.color = '#000';
     }
@@ -106,7 +105,8 @@
     type GameCreatePayload = { result_team1: number; result_team2: number; teams: TeamCreatePayload[] };
 
     // endpoint base (public, browser-safe)
-    const API_URL = $derived(PUBLIC_API_BASE ?? '/api');
+    const API_BASE = $derived((PUBLIC_API_BASE ?? '').replace(/\/$/, ''));
+    const GAMES_ENDPOINT = $derived(`${API_BASE}/api/games`);
 
     let submitting = $state(false);
     let lastGameId = $state<number | null>(null);
@@ -119,13 +119,17 @@
         try {
             toast.promise(
                 (async () => {
-                    const res = await fetch(`${API_URL}/api/games/${lastGameId}`, {method: "DELETE"});
+                    const res = await fetch(`${GAMES_ENDPOINT}/${lastGameId}`, {method: "DELETE"});
                     if (!res.ok) {
                         const t = await res.text().catch(() => "");
                         throw new Error(t || `Undo failed (${res.status})`);
                     }
                 })(),
-                {loading: "Undoing…", success: "Submission undone.", error: (e) => e.message || "Failed to undo."}
+                {
+                    loading: "Undoing…",
+                    success: "Submission undone.",
+                    error: (e: unknown) => e instanceof Error ? e.message : "Failed to undo."
+                }
             );
             lastGameId = null;
         } catch { /* toast.promise handled error */
@@ -172,15 +176,15 @@
         }
 
         const teams: TeamCreatePayload[] = [
-            ...redCol.items.map(i => ({ player_id: i.id, team_number: 1 })),
-            ...blueCol.items.map(i => ({ player_id: i.id, team_number: 2 }))
+            ...redCol.items.map(i => ({player_id: i.id, team_number: 1 as const})),
+            ...blueCol.items.map(i => ({player_id: i.id, team_number: 2 as const}))
         ];
         const payload: GameCreatePayload = { result_team1: r, result_team2: b, teams };
 
         submitting = true;
         try {
             const data = await (async () => {
-                const res = await fetch(`${API_URL}/api/games`, {
+                const res = await fetch(GAMES_ENDPOINT, {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify(payload)
