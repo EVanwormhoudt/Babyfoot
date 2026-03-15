@@ -12,10 +12,21 @@ export type TeamRead = {
     player: PlayerRead;
 };
 
+export type GameRatingChangeRead = {
+    player_id: number;
+    rating_type: 'overall' | 'monthly' | 'yearly';
+    mu_before: number;
+    mu_after: number;
+    sigma_before: number;
+    sigma_after: number;
+    delta_mu: number;
+};
+
 export type GameRead = {
     id: number;
     game_timestamp: string; // ISO string
     result_team1: number;
     result_team2: number;
     teams: TeamRead[];
+    rating_changes?: GameRatingChangeRead[];
 };

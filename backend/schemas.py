@@ -69,12 +69,25 @@ class GameUpdate(BaseModel):
     result_team2: int
 
 
+class GamePlayerRatingChangeRead(BaseModel):
+    player_id: int
+    rating_type: Literal["overall", "monthly", "yearly"]
+    mu_before: float
+    mu_after: float
+    sigma_before: float
+    sigma_after: float
+    delta_mu: float
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class GameRead(BaseModel):
     id: int
     game_timestamp: datetime
     result_team1: int
     result_team2: int
     teams: List[TeamRead]
+    rating_changes: List[GamePlayerRatingChangeRead] = []
 
     model_config = ConfigDict(from_attributes=True)
 

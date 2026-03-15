@@ -27,6 +27,7 @@ class Player(SQLModel, table=True):
     rating_history: Optional[List["PlayerRatingHistory"]] = Relationship(back_populates="player")
     rating: Optional["CurrentPlayerRank"] = Relationship(back_populates="player",
                                                          sa_relationship_kwargs={"uselist": False})
+    rating_changes: Optional[List["GamePlayerRatingChange"]] = Relationship(back_populates="player")
     teams: List["Team"] = Relationship(back_populates="player")   # <-- this is the ONLY Team-related rel on Player
 
 class PlayerRatingHistory(SQLModel, table=True):
@@ -68,6 +69,7 @@ class Game(SQLModel, table=True):
     result_team1: int
     result_team2: int
     teams: List["Team"] = Relationship(back_populates="game")
+    rating_changes: List["GamePlayerRatingChange"] = Relationship(back_populates="game")
 
     class Config:
         arbitrary_types_allowed = True
@@ -158,6 +160,28 @@ class CurrentPlayerRank(SQLModel, table=True):
                 self.sigma_yearly = value
             case "overall":
                 self.sigma_overall = value
+
+
+class GamePlayerRatingChange(SQLModel, table=True):
+    __tablename__ = "game_player_rating_change"
+    __table_args__ = (
+        UniqueConstraint("game_id", "player_id", "rating_type", name="uq_gprc_game_player_type"),
+        Index("ix_gprc_game_rating_type", "game_id", "rating_type"),
+        Index("ix_gprc_player_game", "player_id", "game_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    game_id: int = Field(foreign_key="games.id")
+    player_id: int = Field(foreign_key="players.id")
+    rating_type: str
+    mu_before: float
+    mu_after: float
+    sigma_before: float
+    sigma_after: float
+    delta_mu: float
+
+    game: Optional["Game"] = Relationship(back_populates="rating_changes")
+    player: Optional["Player"] = Relationship(back_populates="rating_changes")
 
 
 @dataclass

@@ -12,7 +12,13 @@ from sqlmodel import Session, select
 from .db_errors import map_integrity_error
 from ..db.models import Game, Team, Player
 from ..db.session import get_session
-from ..ranking import recalculate_all_ratings, update_all_ratings
+from ..ranking import (
+    recalculate_all_ratings,
+    update_all_ratings,
+    snapshot_player_ratings,
+    build_game_rating_change_rows,
+    RATING_TYPES_ALL,
+)
 from ..schemas import GameCreate, GameRead, GameUpdate, GamesList
 from ..settings import settings
 
@@ -35,7 +41,8 @@ def get_games(
     stmt = (
         select(Game)
         .options(
-            selectinload(Game.teams).selectinload(Team.player)  # load players for each team
+            selectinload(Game.teams).selectinload(Team.player),
+            selectinload(Game.rating_changes),
         )
     )
 
@@ -117,13 +124,24 @@ def create_game(game: GameCreate, session: Session = Depends(get_session)):
         team1 = [players_by_id[t.player_id] for t in game.teams if t.team_number == 1]
         team2 = [players_by_id[t.player_id] for t in game.teams if t.team_number == 2]
 
+        players_in_game = team1 + team2
+        before = snapshot_player_ratings(players_in_game, RATING_TYPES_ALL)
         update_all_ratings(new_game, team1, team2)
+        after = snapshot_player_ratings(players_in_game, RATING_TYPES_ALL)
+        for row in build_game_rating_change_rows(
+                new_game.id,
+                players_in_game,
+                before,
+                after,
+                RATING_TYPES_ALL,
+        ):
+            session.add(row)
         session.commit()
 
         # Eager-load relationships so Pydantic can serialize after the transaction
         game_full = session.exec(
             select(Game)
-            .options(selectinload(Game.teams).selectinload(Team.player))
+            .options(selectinload(Game.teams).selectinload(Team.player), selectinload(Game.rating_changes))
             .where(Game.id == new_game.id)
         ).first()
         return game_full
@@ -143,7 +161,7 @@ def get_game(game_id: int, session: Session = Depends(get_session)) -> GameRead:
     game = session.exec(
         select(Game)
         .where(Game.id == game_id)
-        .options(selectinload(Game.teams).selectinload(Team.player))
+        .options(selectinload(Game.teams).selectinload(Team.player), selectinload(Game.rating_changes))
     ).first()
     if not game:
         raise HTTPException(404, "Game not found")
@@ -177,7 +195,7 @@ def update_game(game_id: int, payload: GameUpdate, session: Session = Depends(ge
     updated = session.exec(
         select(Game)
         .where(Game.id == game_id)
-        .options(selectinload(Game.teams).selectinload(Team.player))
+        .options(selectinload(Game.teams).selectinload(Team.player), selectinload(Game.rating_changes))
     ).first()
     return updated
 

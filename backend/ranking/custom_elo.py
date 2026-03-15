@@ -2,14 +2,73 @@ import datetime as _dt
 from typing import Any, Callable, Dict, List, Optional, Sequence, TYPE_CHECKING
 
 from sqlalchemy.orm import selectinload
+from sqlalchemy import delete
 from sqlmodel import select
 
 from ..consts import DEFAULT_RATING, DEFAULT_SIGMA
-from ..db.models import CurrentPlayerRank, Game, Player, Team
+from ..db.models import CurrentPlayerRank, Game, Player, Team, GamePlayerRatingChange
 from ..settings import settings
 
 if TYPE_CHECKING:
     from sqlmodel import Session
+
+RATING_TYPES_ALL = ["overall", "monthly", "yearly"]
+
+
+def snapshot_player_ratings(
+        players: Sequence["Player"],
+        rating_types: Sequence[str],
+) -> Dict[tuple[int, str], Dict[str, float]]:
+    snapshot: Dict[tuple[int, str], Dict[str, float]] = {}
+    for player in players:
+        if player.rating is None:
+            raise ValueError(f"Player {player.id} is missing a rating row")
+        for rating_type in rating_types:
+            snapshot[(player.id, rating_type)] = {
+                "mu": float(player.rating.get_mu(rating_type)),
+                "sigma": float(player.rating.get_sigma(rating_type)),
+            }
+    return snapshot
+
+
+def build_game_rating_change_rows(
+        game_id: int,
+        players: Sequence["Player"],
+        before: Dict[tuple[int, str], Dict[str, float]],
+        after: Dict[tuple[int, str], Dict[str, float]],
+        rating_types: Sequence[str],
+) -> List[GamePlayerRatingChange]:
+    rows: List[GamePlayerRatingChange] = []
+    for player in players:
+        for rating_type in rating_types:
+            before_key = before[(player.id, rating_type)]
+            after_key = after[(player.id, rating_type)]
+            rows.append(
+                GamePlayerRatingChange(
+                    game_id=game_id,
+                    player_id=player.id,
+                    rating_type=rating_type,
+                    mu_before=before_key["mu"],
+                    mu_after=after_key["mu"],
+                    sigma_before=before_key["sigma"],
+                    sigma_after=after_key["sigma"],
+                    delta_mu=after_key["mu"] - before_key["mu"],
+                )
+            )
+    return rows
+
+
+def _rating_types_for_game(
+        game_ts: Optional[_dt.datetime],
+        first_of_year: _dt.datetime,
+        first_of_month: _dt.datetime,
+) -> List[str]:
+    rating_types = ["overall"]
+    if game_ts is not None and game_ts >= first_of_year:
+        rating_types.append("yearly")
+    if game_ts is not None and game_ts >= first_of_month:
+        rating_types.append("monthly")
+    return rating_types
 
 
 def update_all_ratings(
@@ -217,6 +276,7 @@ def recalculate_all_ratings(session: "Session") -> None:
             player.rating.last_updated = now
 
     session.flush()
+    session.exec(delete(GamePlayerRatingChange))
 
     games = session.exec(
         select(Game)
@@ -253,26 +313,24 @@ def recalculate_all_ratings(session: "Session") -> None:
             else:
                 game_ts = game_ts.astimezone(settings.tz)
 
+        rating_types = _rating_types_for_game(game_ts, first_of_year, first_of_month)
+        players_in_game = team1 + team2
+        before = snapshot_player_ratings(players_in_game, rating_types)
+
         update_all_ratings(
             game,
             team1,
             team2,
-            rating_types=["overall"],
+            rating_types=rating_types,
             timestamp_tz=settings.tz,
         )
-        if game_ts is not None and game_ts >= first_of_year:
-            update_all_ratings(
-                game,
-                team1,
-                team2,
-                rating_types=["yearly"],
-                timestamp_tz=settings.tz,
-            )
-        if game_ts is not None and game_ts >= first_of_month:
-            update_all_ratings(
-                game,
-                team1,
-                team2,
-                rating_types=["monthly"],
-                timestamp_tz=settings.tz,
-            )
+        after = snapshot_player_ratings(players_in_game, rating_types)
+
+        for row in build_game_rating_change_rows(
+                game.id,
+                players_in_game,
+                before,
+                after,
+                rating_types,
+        ):
+            session.add(row)

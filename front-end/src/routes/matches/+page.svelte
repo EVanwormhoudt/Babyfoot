@@ -50,6 +50,38 @@
         return u.toString();
     }
 
+    function getOverallChange(game: any, playerId: number): { delta: number; muAfter: number } | null {
+        const change = game.rating_changes?.find(
+            (item: any) => item.player_id === playerId && item.rating_type === 'overall'
+        );
+        if (typeof change?.delta_mu !== 'number' || typeof change?.mu_after !== 'number') {
+            return null;
+        }
+        return {
+            delta: change.delta_mu,
+            muAfter: change.mu_after
+        };
+    }
+
+    function formatDelta(delta: number) {
+        const sign = delta > 0 ? '+' : '';
+        return `${sign}${delta.toFixed(1)}`;
+    }
+
+    function formatElo(mu: number) {
+        return `Elo ${mu.toFixed(1)}`;
+    }
+
+    function statsHref(playerId: number) {
+        return `/stats?player_id=${playerId}&scope=overall`;
+    }
+
+    function deltaClass(delta: number) {
+        if (delta > 0) return 'text-emerald-400';
+        if (delta < 0) return 'text-rose-400';
+        return 'text-muted-foreground';
+    }
+
     let range: any | undefined;
 
     // Initialize from URL on first run (so the picker reflects current filters)
@@ -137,10 +169,23 @@
                         <!-- LEFT team chips (tight to score) -->
                         <div class="flex flex-wrap gap-2 max-w-[45%] justify-end">
                             {#each t1 as m}
-                                <Badge class="rounded-full px-3 py-1
-                        {t1Wins ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-400/25' : 'bg-muted text-foreground/80 ring-1 ring-border/50'}">
-                                    {m.player.player_name ?? `P${m.player.id}`}
-                                </Badge>
+                                {@const mmrChange = getOverallChange(game, m.player_id)}
+                                <div class="inline-flex flex-col items-end gap-1">
+                                    <Badge class="rounded-full px-3 py-1
+                            {t1Wins ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-400/25' : 'bg-muted text-foreground/80 ring-1 ring-border/50'}">
+                                        <a href={statsHref(m.player_id)} class="hover:underline">
+                                            {m.player.player_name ?? `P${m.player.id}`}
+                                        </a>
+                                    </Badge>
+                                    {#if mmrChange}
+                                        <div class="text-[10px] leading-none inline-flex items-center gap-1">
+                                            <span class="text-muted-foreground">{formatElo(mmrChange.muAfter)}</span>
+                                            <span class="font-semibold {deltaClass(mmrChange.delta)}">
+                                                {formatDelta(mmrChange.delta)}
+                                            </span>
+                                        </div>
+                                    {/if}
+                                </div>
                             {/each}
                         </div>
 
@@ -156,10 +201,24 @@
                         <!-- RIGHT team chips (tight to score) -->
                         <div class="flex flex-wrap gap-2 max-w-[45%]">
                             {#each t2 as m}
-                                <Badge class="rounded-full px-3 py-1
-                        {t2Wins ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-400/25' : 'bg-muted text-foreground/80 ring-1 ring-border/50'}">
-                                    {m.player.player_name ?? `P${m.player.id}`}
-                                </Badge>
+                                {@const mmrChange = getOverallChange(game, m.player_id)}
+                                <div class="inline-flex flex-col items-start gap-1">
+                                    <Badge class="rounded-full px-3 py-1
+                            {t2Wins ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-400/25' : 'bg-muted text-foreground/80 ring-1 ring-border/50'}">
+                                        <a href={statsHref(m.player_id)} class="hover:underline">
+                                            {m.player.player_name ?? `P${m.player.id}`}
+                                        </a>
+                                    </Badge>
+                                    {#if mmrChange}
+                                        <div class="text-[10px] leading-none inline-flex items-center gap-1">
+
+                                            <span class="text-muted-foreground">{formatElo(mmrChange.muAfter)}</span>
+                                            <span class="font-semibold {deltaClass(mmrChange.delta)}">
+                                                {formatDelta(mmrChange.delta)}
+                                            </span>
+                                        </div>
+                                    {/if}
+                                </div>
                             {/each}
                         </div>
                     </div>
@@ -219,5 +278,3 @@
     </div>
 {/if}
 <div class="h-6"></div>
-
-
