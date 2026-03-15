@@ -9,24 +9,51 @@ from backend.settings import settings
 from sqlalchemy import case, and_, or_, func
 
 
-def get_scope_date(scope: str) -> Optional[datetime.datetime]:
+def get_scope_bounds(
+        scope: str,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+) -> tuple[Optional[datetime.datetime], Optional[datetime.datetime]]:
     now = datetime.datetime.now(tz=settings.tz)
+    if scope == "overall":
+        return None, None
+
+    y = year or now.year
+    if scope == "yearly":
+        start = datetime.datetime(y, 1, 1, tzinfo=settings.tz)
+        end = datetime.datetime(y + 1, 1, 1, tzinfo=settings.tz)
+        return start, end
+
     if scope == "monthly":
-        return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif scope == "yearly":
-        return now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    return None  # overall
+        m = month or now.month
+        if not 1 <= m <= 12:
+            raise ValueError("month must be in 1..12")
+        start = datetime.datetime(y, m, 1, tzinfo=settings.tz)
+        if m == 12:
+            end = datetime.datetime(y + 1, 1, 1, tzinfo=settings.tz)
+        else:
+            end = datetime.datetime(y, m + 1, 1, tzinfo=settings.tz)
+        return start, end
+
+    raise ValueError("scope must be one of: overall, monthly, yearly")
 
 
-def get_win_streaks(session: Session, player_id: int, date_filter: Optional[datetime]):
+def get_win_streaks(
+        session: Session,
+        player_id: int,
+        start_date: Optional[datetime.datetime],
+        end_date: Optional[datetime.datetime],
+):
     stmt = (
         select(Game, Team)
         .join(Team, Game.id == Team.game_id)
         .where(Team.player_id == player_id)
         .order_by(Game.game_timestamp)
     )
-    if date_filter:
-        stmt = stmt.where(Game.game_timestamp >= date_filter)
+    if start_date:
+        stmt = stmt.where(Game.game_timestamp >= start_date)
+    if end_date:
+        stmt = stmt.where(Game.game_timestamp < end_date)
 
     results = session.exec(stmt).all()
 
@@ -47,7 +74,12 @@ def get_win_streaks(session: Session, player_id: int, date_filter: Optional[date
     return {"longest_win_streak": max_streak, "current_win_streak": streak}
 
 
-def get_basic_stats(session: Session, player_id: int, date_filter: Optional[datetime]):
+def get_basic_stats(
+        session: Session,
+        player_id: int,
+        start_date: Optional[datetime.datetime],
+        end_date: Optional[datetime.datetime],
+):
     team_alias = Team
     game_alias = Game
 
@@ -83,15 +115,20 @@ def get_basic_stats(session: Session, player_id: int, date_filter: Optional[date
         .where(team_alias.player_id == player_id)
     )
 
-    if date_filter:
-        stmt = stmt.where(game_alias.game_timestamp >= date_filter)
+    if start_date:
+        stmt = stmt.where(game_alias.game_timestamp >= start_date)
+    if end_date:
+        stmt = stmt.where(game_alias.game_timestamp < end_date)
 
-    result = session.exec(stmt).one()
-
-    return result
+    return session.exec(stmt).one()
 
 
-def get_teammate_stats(session: Session, player_id: int, date_filter: Optional[datetime]):
+def get_teammate_stats(
+        session: Session,
+        player_id: int,
+        start_date: Optional[datetime.datetime],
+        end_date: Optional[datetime.datetime],
+):
     PT = Team  # player_team alias
     T = aliased(Team, name="teammate")  # teammate alias
     P = Player
@@ -129,8 +166,10 @@ def get_teammate_stats(session: Session, player_id: int, date_filter: Optional[d
         .having(func.count() >= 3)
     )
 
-    if date_filter:
-        stmt = stmt.where(G.game_timestamp >= date_filter)
+    if start_date:
+        stmt = stmt.where(G.game_timestamp >= start_date)
+    if end_date:
+        stmt = stmt.where(G.game_timestamp < end_date)
 
     rows = session.exec(stmt).all()
 

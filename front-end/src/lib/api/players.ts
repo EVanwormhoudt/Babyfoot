@@ -4,6 +4,7 @@ import {PUBLIC_API_BASE} from '$env/static/public';
 export type Scope = 'monthly' | 'yearly' | 'overall';
 export type F = typeof fetch;
 export type LeaderboardOpts = { year?: number; month?: number };
+export type StatsOpts = { year?: number; month?: number };
 export type TeammateStat = {
     player_id: number;
     player_name: string;
@@ -125,9 +126,26 @@ export async function getLeaderboard(
     return res.json();
 }
 
-export async function getPlayerStats(id: number, scope = 'overall', eventFetch?: F) {
-    const f = eventFetch ?? fetch;
-    const res = await f(`${PUBLIC_API_BASE}/api/players/${id}/stats?scope=${scope}`);
+export async function getPlayerStats(
+    id: number,
+    scope: Scope = 'overall',
+    optsOrFetch?: StatsOpts | F,
+    maybeFetch?: F
+) {
+    const opts: StatsOpts =
+        typeof optsOrFetch === 'function' ? {} : (optsOrFetch ?? {});
+    const f: F =
+        typeof optsOrFetch === 'function' ? (optsOrFetch as F) : (maybeFetch ?? fetch);
+
+    const params = new URLSearchParams({scope});
+    if (typeof opts.year === 'number' && Number.isFinite(opts.year)) {
+        params.set('year', String(opts.year));
+    }
+    if (scope === 'monthly' && typeof opts.month === 'number' && opts.month >= 1 && opts.month <= 12) {
+        params.set('month', String(opts.month));
+    }
+
+    const res = await f(`${PUBLIC_API_BASE}/api/players/${id}/stats?${params.toString()}`);
     if (!res.ok) {
         throw new Error(`Failed to load player stats (${res.status})`);
     }

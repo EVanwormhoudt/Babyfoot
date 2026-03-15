@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 from ..db.models import Game, Player, Team
 from ..db.session import get_session
 from ..schemas import GameRead, PlayerStats
-from ..utils import get_scope_date, get_basic_stats, get_teammate_stats, get_win_streaks
+from ..utils import get_scope_bounds, get_basic_stats, get_teammate_stats, get_win_streaks
 
 router = APIRouter()
 
@@ -32,16 +32,32 @@ def get_player_games(player_id: int, session: Session = Depends(get_session)):
 def get_player_stats(
         player_id: int,
         scope: Literal["overall", "monthly", "yearly"] = Query("overall"),
+        year: int | None = Query(
+            None,
+            description="Year to filter by (used for monthly/yearly). Defaults to current year.",
+        ),
+        month: int | None = Query(
+            None,
+            ge=1,
+            le=12,
+            description="Month (1..12). Used only for monthly. Defaults to current month.",
+        ),
         session: Session = Depends(get_session),
 ):
     if not session.get(Player, player_id):
         raise HTTPException(404, "Player not found")
 
-    since = get_scope_date(scope)
+    if scope != "monthly" and month is not None:
+        raise HTTPException(422, "month is only supported when scope=monthly")
 
-    basic = get_basic_stats(session, player_id, since)
-    teammates = get_teammate_stats(session, player_id, since)
-    streaks = get_win_streaks(session, player_id, since)
+    try:
+        start_dt, end_dt = get_scope_bounds(scope, year=year, month=month)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+    basic = get_basic_stats(session, player_id, start_dt, end_dt)
+    teammates = get_teammate_stats(session, player_id, start_dt, end_dt)
+    streaks = get_win_streaks(session, player_id, start_dt, end_dt)
 
     games_played = int(basic.games_played or 0)
     wins = int(basic.wins or 0)

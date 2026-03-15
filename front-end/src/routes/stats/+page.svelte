@@ -48,7 +48,24 @@
 
     let selectedPlayerId = $state(data.selectedPlayerId ? String(data.selectedPlayerId) : '');
     let selectedScope = $state<Scope>(data.scope);
+    let selectedYear = $state(String(data.selectedYear));
+    let selectedMonth = $state(String(data.selectedMonth));
     let hoveredPointIndex = $state<number | null>(null);
+
+    const monthOptions = [
+        {value: 1, label: 'January'},
+        {value: 2, label: 'February'},
+        {value: 3, label: 'March'},
+        {value: 4, label: 'April'},
+        {value: 5, label: 'May'},
+        {value: 6, label: 'June'},
+        {value: 7, label: 'July'},
+        {value: 8, label: 'August'},
+        {value: 9, label: 'September'},
+        {value: 10, label: 'October'},
+        {value: 11, label: 'November'},
+        {value: 12, label: 'December'}
+    ];
 
     const selectedPlayer = $derived(
         data.players.find((p: { id: number }) => String(p.id) === selectedPlayerId)
@@ -57,11 +74,27 @@
     const selectedPlayerName = $derived(
         selectedPlayer?.player_name ?? 'Player'
     );
+    const selectedScopeLabel = $derived.by(() => {
+        if (selectedScope === 'monthly') {
+            const month = monthOptions.find((item) => String(item.value) === selectedMonth);
+            return `${month?.label ?? 'Month'} ${selectedYear}`;
+        }
+        if (selectedScope === 'yearly') {
+            return selectedYear;
+        }
+        return 'Overall';
+    });
 
     function applyFilters() {
         const params = new URLSearchParams();
         if (selectedPlayerId) params.set('player_id', selectedPlayerId);
         params.set('scope', selectedScope);
+        if (selectedScope !== 'overall') {
+            params.set('year', selectedYear);
+        }
+        if (selectedScope === 'monthly') {
+            params.set('month', selectedMonth);
+        }
 
         goto(`?${params.toString()}`, {replaceState: true, noScroll: true});
     }
@@ -262,7 +295,7 @@
             </CardContent>
         </Card>
     {:else}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
             <label class="flex flex-col gap-2">
                 <span class="text-sm text-muted-foreground">Who are you?</span>
                 <select
@@ -288,6 +321,36 @@
                     <option value="yearly">Yearly</option>
                 </select>
             </label>
+
+            {#if selectedScope === 'monthly' || selectedScope === 'yearly'}
+                <label class="flex flex-col gap-2">
+                    <span class="text-sm text-muted-foreground">Year</span>
+                    <select
+                            bind:value={selectedYear}
+                            class="h-10 rounded-md border bg-background px-3 text-sm"
+                            onchange={applyFilters}
+                    >
+                        {#each data.yearOptions as year}
+                            <option value={String(year)}>{year}</option>
+                        {/each}
+                    </select>
+                </label>
+            {/if}
+
+            {#if selectedScope === 'monthly'}
+                <label class="flex flex-col gap-2">
+                    <span class="text-sm text-muted-foreground">Month</span>
+                    <select
+                            bind:value={selectedMonth}
+                            class="h-10 rounded-md border bg-background px-3 text-sm"
+                            onchange={applyFilters}
+                    >
+                        {#each monthOptions as month}
+                            <option value={String(month.value)}>{month.label}</option>
+                        {/each}
+                    </select>
+                </label>
+            {/if}
         </div>
 
         {#if data.statsError}
@@ -299,7 +362,7 @@
         {:else if data.stats}
             <Card>
                 <CardHeader>
-                    <CardTitle>{selectedPlayerName} ({selectedScope})</CardTitle>
+                    <CardTitle>{selectedPlayerName} ({selectedScopeLabel})</CardTitle>
                 </CardHeader>
                 <CardContent class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                     <div class="rounded-md border p-3">
@@ -368,7 +431,7 @@
         {:else}
             <Card>
                 <CardHeader>
-                    <CardTitle>{selectedPlayerName} rating history ({selectedScope})</CardTitle>
+                    <CardTitle>{selectedPlayerName} rating history ({selectedScopeLabel})</CardTitle>
                 </CardHeader>
                 <CardContent class="space-y-3">
                     <svg
