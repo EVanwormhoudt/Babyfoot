@@ -43,15 +43,20 @@ def get_player_stats(
     teammates = get_teammate_stats(session, player_id, since)
     streaks = get_win_streaks(session, player_id, since)
 
+    games_played = int(basic.games_played or 0)
+    wins = int(basic.wins or 0)
+    average_team_score = float(basic.avg_team_score or 0.0)
+    average_opponent_score = float(basic.avg_opponent_score or 0.0)
+
     best = max(teammates, key=lambda x: x["win_rate"], default=None)
     worst = min(teammates, key=lambda x: x["win_rate"], default=None)
 
     return PlayerStats(
-        games_played=basic.games_played,
-        wins=basic.wins,
-        win_rate=(basic.wins / basic.games_played) if basic.games_played else 0.0,
-        average_team_score=basic.avg_team_score,
-        average_opponent_score=basic.avg_opponent_score,
+        games_played=games_played,
+        wins=wins,
+        win_rate=(wins / games_played) if games_played else 0.0,
+        average_team_score=average_team_score,
+        average_opponent_score=average_opponent_score,
         best_teammate=best,
         worst_teammate=worst,
         **streaks,
