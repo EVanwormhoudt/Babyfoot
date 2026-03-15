@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional, Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -82,6 +82,17 @@ class GameRead(BaseModel):
 class GamesList(BaseModel):
     items: List[GameRead]
     total: int
+
+
+class PlayerRatingHistoryPoint(BaseModel):
+    date: date
+    mu: Optional[float] = None
+    sigma: Optional[float] = None
+    rank: int
+    rank_type: Literal["monthly", "yearly", "overall"]
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 # ---- Stats ----
 class TeammateStat(BaseModel):

@@ -24,6 +24,14 @@ export type PlayerStats = {
     longest_win_streak: number;
 };
 
+export type PlayerRatingHistoryPoint = {
+    date: string;
+    mu: number | null;
+    sigma: number | null;
+    rank: number;
+    rank_type: Scope;
+};
+
 export async function getPlayers(eventFetch?: F) {
     const f = eventFetch ?? fetch;
     // If you can, add a fields param on the backend to keep this light
@@ -68,6 +76,28 @@ export async function getPlayerHistory(id: number, eventFetch?: F) {
     const f = eventFetch ?? fetch;
     const res = await f(`${PUBLIC_API_BASE}/api/players/${id}/history`);
     return res.json();
+}
+
+export async function getPlayerRatingHistory(
+    id: number,
+    ratingType?: Scope,
+    eventFetch?: F
+) {
+    const f = eventFetch ?? fetch;
+    const params = new URLSearchParams();
+    if (ratingType) {
+        params.set('rating_type', ratingType);
+    }
+    const query = params.toString();
+    const url = query
+        ? `${PUBLIC_API_BASE}/api/players/${id}/rating-history?${query}`
+        : `${PUBLIC_API_BASE}/api/players/${id}/rating-history`;
+
+    const res = await f(url);
+    if (!res.ok) {
+        throw new Error(`Failed to load rating history (${res.status})`);
+    }
+    return res.json() as Promise<PlayerRatingHistoryPoint[]>;
 }
 
 

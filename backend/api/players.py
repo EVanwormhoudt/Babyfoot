@@ -13,7 +13,13 @@ from .db_errors import map_integrity_error
 from ..consts import DEFAULT_RATING, DEFAULT_SIGMA
 from ..db.models import Player, CurrentPlayerRank, Team, Game, PlayerRatingHistory
 from ..db.session import get_session
-from ..schemas import PlayerCreate, PlayerRead, PlayerUpdate, PlayerLeaderboard
+from ..schemas import (
+    PlayerCreate,
+    PlayerRead,
+    PlayerUpdate,
+    PlayerLeaderboard,
+    PlayerRatingHistoryPoint,
+)
 from ..settings import settings
 
 router = APIRouter()
@@ -217,6 +223,29 @@ def get_player(player_id: int, session: Session = Depends(get_session)):
     if not player:
         raise HTTPException(404, "Player not found")
     return player
+
+
+@router.get("/{player_id}/rating-history", response_model=List[PlayerRatingHistoryPoint])
+def get_player_rating_history(
+        player_id: int,
+        rating_type: Optional[Literal["monthly", "yearly", "overall"]] = Query(
+            None,
+            description="Optional filter for rating snapshot type",
+        ),
+        session: Session = Depends(get_session),
+):
+    if not session.get(Player, player_id):
+        raise HTTPException(404, "Player not found")
+
+    stmt = (
+        select(PlayerRatingHistory)
+        .where(PlayerRatingHistory.player_id == player_id)
+        .order_by(PlayerRatingHistory.date.asc(), PlayerRatingHistory.update_id.asc())
+    )
+    if rating_type is not None:
+        stmt = stmt.where(PlayerRatingHistory.rank_type == rating_type)
+
+    return session.exec(stmt).all()
 
 
 @router.put("/{player_id}", response_model=PlayerRead)
