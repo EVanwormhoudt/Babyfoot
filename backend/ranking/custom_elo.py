@@ -96,7 +96,8 @@ def update_all_ratings(
       1) Compute team effective ratings: mean(mu - c*sigma)
       2) Expected team score via logistic: E = 1 / (1 + 10^((opp - cur)/400))
       3) Team delta: Δteam = K * M_margin * (S - E), where M_margin ∈ [1, mu_margin_top]
-      4) Split Δteam across teammates (equal or weighted). Winners up, losers down.
+      4) Split Δteam across teammates (weighted). Higher-Elo winners gain less;
+         higher-Elo losers lose more.
       5) σ updates are gentle, also scaled by a smaller margin multiplier.
 
     Notes:
@@ -167,7 +168,7 @@ def update_all_ratings(
             setattr(obj, f"{base}_{rt}", float(val))
         return _set
 
-    # Weighting for splitting team delta (default equal)
+    # Optional external weighting (e.g., minutes played)
     def _weights_for(team: Sequence["Player"]) -> Dict[int, float]:
         if not weights:
             return {p.id: 1.0 for p in team}
@@ -178,11 +179,35 @@ def update_all_ratings(
 
     w1 = _weights_for(team1)
     w2 = _weights_for(team2)
-    sum_w1 = sum(w1.values())
-    sum_w2 = sum(w2.values())
 
     # Core per-rating loop
     for rating_type in rating_types:
+        def shares_for(team: Sequence["Player"], base_w: Dict[int, float], team_delta: float) -> Dict[int, float]:
+            if len(team) == 1:
+                return {team[0].id: 1.0}
+
+            # Draws keep a neutral split.
+            if abs(team_delta) < 1e-12:
+                neutral_total = sum(base_w[p.id] for p in team)
+                if neutral_total <= 0.0:
+                    return {p.id: 1.0 / len(team) for p in team}
+                return {p.id: base_w[p.id] / neutral_total for p in team}
+
+            # Winners (positive delta): lower Elo gets larger share.
+            # Losers  (negative delta): higher Elo gets larger share.
+            raw: Dict[int, float] = {}
+            for p in team:
+                r = p.rating
+                get_mu = _getter(r, "mu")
+                mu = max(100.0, get_mu(rating_type))
+                elo_factor = (1.0 / mu) if team_delta > 0 else mu
+                raw[p.id] = base_w[p.id] * elo_factor
+
+            total = sum(raw.values())
+            if total <= 0.0:
+                return {p.id: 1.0 / len(team) for p in team}
+            return {p.id: raw[p.id] / total for p in team}
+
         # Team effective ratings
         def eff(p: "Player") -> float:
             r = p.rating
@@ -203,19 +228,21 @@ def update_all_ratings(
         # Team deltas with margin multiplier
         delta_team1 = K * M_mu * (s1 - E1)
         delta_team2 = K * M_mu * (s2 - E2)  # should be -delta_team1 (up to rounding)
+        shares_t1 = shares_for(team1, w1, delta_team1)
+        shares_t2 = shares_for(team2, w2, delta_team2)
 
         # Apply μ updates: split team delta among teammates
         for p in team1:
             r = p.rating
             get_mu = _getter(r, "mu"); set_mu = _setter(r, "mu")
-            share = (w1[p.id] / sum_w1) if sum_w1 > 0 else (1.0 / len(team1))
+            share = shares_t1.get(p.id, 1.0 / len(team1))
             new_mu = get_mu(rating_type) + delta_team1 * share
             set_mu(rating_type, new_mu)
 
         for p in team2:
             r = p.rating
             get_mu = _getter(r, "mu"); set_mu = _setter(r, "mu")
-            share = (w2[p.id] / sum_w2) if sum_w2 > 0 else (1.0 / len(team2))
+            share = shares_t2.get(p.id, 1.0 / len(team2))
             new_mu = get_mu(rating_type) + delta_team2 * share
             set_mu(rating_type, new_mu)
 
