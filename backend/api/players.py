@@ -165,7 +165,7 @@ def get_leaderboard(
 def create_player(payload: PlayerCreate, session: Session = Depends(get_session)):
     exists = session.exec(select(Player).where(Player.player_name == payload.player_name)).first()
     if exists:
-        raise HTTPException(status_code=400, detail="Player already exists")
+        raise HTTPException(status_code=400, detail="Le joueur existe deja")
 
     try:
         p = Player(active=True, **payload.model_dump())
@@ -187,10 +187,10 @@ def create_player(payload: PlayerCreate, session: Session = Depends(get_session)
         session.commit()
     except IntegrityError as e:
         session.rollback()
-        raise map_integrity_error(e, "Failed to create player due to a database constraint")
+        raise map_integrity_error(e, "Echec de creation du joueur (contrainte base de donnees)")
     except Exception as e:
         session.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to create player: {e}")
+        raise HTTPException(status_code=500, detail=f"Echec de creation du joueur : {e}")
 
     created = session.exec(
         select(Player)
@@ -221,7 +221,7 @@ def get_player(player_id: int, session: Session = Depends(get_session)):
         select(Player).where(Player.id == player_id).options(selectinload(Player.rating))
     ).first()
     if not player:
-        raise HTTPException(404, "Player not found")
+        raise HTTPException(404, "Joueur introuvable")
     return player
 
 
@@ -235,7 +235,7 @@ def get_player_rating_history(
         session: Session = Depends(get_session),
 ):
     if not session.get(Player, player_id):
-        raise HTTPException(404, "Player not found")
+        raise HTTPException(404, "Joueur introuvable")
 
     stmt = (
         select(PlayerRatingHistory)
@@ -252,7 +252,7 @@ def get_player_rating_history(
 def update_player(player_id: int, payload: PlayerUpdate, session: Session = Depends(get_session)):
     p = session.get(Player, player_id)
     if not p:
-        raise HTTPException(404, "Player not found")
+        raise HTTPException(404, "Joueur introuvable")
     updates = payload.model_dump(exclude_unset=True, exclude_none=True)
 
     if "player_name" in updates and updates["player_name"] != p.player_name:
@@ -260,7 +260,7 @@ def update_player(player_id: int, payload: PlayerUpdate, session: Session = Depe
             select(Player).where(Player.player_name == updates["player_name"], Player.id != player_id)
         ).first()
         if exists:
-            raise HTTPException(status_code=400, detail="Player already exists")
+            raise HTTPException(status_code=400, detail="Le joueur existe deja")
 
     for k, v in updates.items():
         setattr(p, k, v)
@@ -268,7 +268,7 @@ def update_player(player_id: int, payload: PlayerUpdate, session: Session = Depe
         session.commit()
     except IntegrityError as e:
         session.rollback()
-        raise map_integrity_error(e, "Failed to update player due to a database constraint")
+        raise map_integrity_error(e, "Echec de mise a jour du joueur (contrainte base de donnees)")
 
     updated = session.exec(
         select(Player).where(Player.id == player_id).options(selectinload(Player.rating))
@@ -280,13 +280,13 @@ def update_player(player_id: int, payload: PlayerUpdate, session: Session = Depe
 def delete_player(player_id: int, session: Session = Depends(get_session)):
     p = session.get(Player, player_id)
     if not p:
-        raise HTTPException(404, "Player not found")
+        raise HTTPException(404, "Joueur introuvable")
 
     has_games = session.exec(
         select(Team.id).where(Team.player_id == player_id).limit(1)
     ).first()
     if has_games:
-        raise HTTPException(409, "Cannot delete player with game history; deactivate instead")
+        raise HTTPException(409, "Impossible de supprimer un joueur avec historique de matchs ; desactivez-le plutot")
 
     rank = session.get(CurrentPlayerRank, player_id)
     if rank:
@@ -303,7 +303,7 @@ def delete_player(player_id: int, session: Session = Depends(get_session)):
         session.commit()
     except IntegrityError as e:
         session.rollback()
-        raise map_integrity_error(e, "Failed to delete player due to a database constraint")
+        raise map_integrity_error(e, "Echec de suppression du joueur (contrainte base de donnees)")
 
     return None
 
@@ -336,7 +336,7 @@ def period_bounds(
     # monthly
     m = month or now.month
     if not 1 <= m <= 12:
-        raise ValueError("month must be in 1..12")
+        raise ValueError("month doit etre entre 1 et 12")
 
     start = datetime(y, m, 1, tzinfo=tzinfo)
     if m == 12:

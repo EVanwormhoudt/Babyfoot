@@ -36,7 +36,7 @@ def get_games(
         end_date: Optional[datetime] = Query(None, description="Filter games up to this date"),
 ) -> GamesList:
     if start_date and end_date and start_date > end_date:
-        raise HTTPException(422, "start_date must be <= end_date")
+        raise HTTPException(422, "start_date doit etre <= end_date")
 
     stmt = (
         select(Game)
@@ -76,17 +76,17 @@ def get_games(
 
 def _validate_game_payload(payload: GameCreate, session: Session) -> Dict[int, Player]:
     if payload.result_team1 < 0 or payload.result_team2 < 0:
-        raise HTTPException(422, "Scores must be non-negative")
+        raise HTTPException(422, "Les scores doivent etre positifs ou nuls")
     if any(t.team_number not in (1, 2) for t in payload.teams):
-        raise HTTPException(422, "team_number must be 1 or 2")
+        raise HTTPException(422, "team_number doit valoir 1 ou 2")
     if not payload.teams:
-        raise HTTPException(422, "At least one player per game is required")
+        raise HTTPException(422, "Chaque match doit contenir au moins un joueur")
 
     ids = [t.player_id for t in payload.teams]
     if len(ids) != len(set(ids)):
-        raise HTTPException(422, "Duplicate players in teams")
+        raise HTTPException(422, "Joueurs en double dans les equipes")
     if not any(t.team_number == 1 for t in payload.teams) or not any(t.team_number == 2 for t in payload.teams):
-        raise HTTPException(422, "Both teams must have at least one player")
+        raise HTTPException(422, "Chaque equipe doit contenir au moins un joueur")
 
     players = session.exec(
         select(Player).where(Player.id.in_(ids)).options(selectinload(Player.rating))
@@ -94,11 +94,11 @@ def _validate_game_payload(payload: GameCreate, session: Session) -> Dict[int, P
     players_by_id = {p.id: p for p in players}
     missing_ids = sorted(set(ids) - set(players_by_id))
     if missing_ids:
-        raise HTTPException(422, f"Unknown player_id(s): {missing_ids}")
+        raise HTTPException(422, f"player_id inconnu(s) : {missing_ids}")
 
     missing_rating = sorted(p.id for p in players if p.rating is None)
     if missing_rating:
-        raise HTTPException(409, f"Player(s) missing rating row: {missing_rating}")
+        raise HTTPException(409, f"Ligne de classement manquante pour le(s) joueur(s) : {missing_rating}")
 
     return players_by_id
 
@@ -150,10 +150,10 @@ def create_game(game: GameCreate, session: Session = Depends(get_session)):
         raise
     except IntegrityError as e:
         session.rollback()
-        raise map_integrity_error(e, "Failed to create game due to a database constraint")
+        raise map_integrity_error(e, "Echec de creation du match (contrainte base de donnees)")
     except Exception as e:
         session.rollback()
-        raise HTTPException(500, f"Failed to create game: {e}")
+        raise HTTPException(500, f"Echec de creation du match : {e}")
 
 
 @router.get("/{game_id}", response_model=GameRead)
@@ -164,7 +164,7 @@ def get_game(game_id: int, session: Session = Depends(get_session)) -> GameRead:
         .options(selectinload(Game.teams).selectinload(Team.player), selectinload(Game.rating_changes))
     ).first()
     if not game:
-        raise HTTPException(404, "Game not found")
+        raise HTTPException(404, "Match introuvable")
     return game
 
 
@@ -172,9 +172,9 @@ def get_game(game_id: int, session: Session = Depends(get_session)) -> GameRead:
 def update_game(game_id: int, payload: GameUpdate, session: Session = Depends(get_session)):
     g = session.get(Game, game_id)
     if not g:
-        raise HTTPException(404, "Game not found")
+        raise HTTPException(404, "Match introuvable")
     if payload.result_team1 < 0 or payload.result_team2 < 0:
-        raise HTTPException(422, "Scores must be non-negative")
+        raise HTTPException(422, "Les scores doivent etre positifs ou nuls")
 
     try:
         g.result_team1 = payload.result_team1
@@ -187,10 +187,10 @@ def update_game(game_id: int, payload: GameUpdate, session: Session = Depends(ge
         raise HTTPException(409, str(e))
     except IntegrityError as e:
         session.rollback()
-        raise map_integrity_error(e, "Failed to update game due to a database constraint")
+        raise map_integrity_error(e, "Echec de mise a jour du match (contrainte base de donnees)")
     except Exception as e:
         session.rollback()
-        raise HTTPException(500, f"Failed to update game: {e}")
+        raise HTTPException(500, f"Echec de mise a jour du match : {e}")
 
     updated = session.exec(
         select(Game)
@@ -204,7 +204,7 @@ def update_game(game_id: int, payload: GameUpdate, session: Session = Depends(ge
 def delete_game(game_id: int, session: Session = Depends(get_session)):
     g = session.get(Game, game_id)
     if not g:
-        raise HTTPException(404, "Game not found")
+        raise HTTPException(404, "Match introuvable")
     try:
         teams = session.exec(select(Team).where(Team.game_id == game_id)).all()
         for team in teams:
@@ -218,9 +218,9 @@ def delete_game(game_id: int, session: Session = Depends(get_session)):
         raise HTTPException(409, str(e))
     except IntegrityError as e:
         session.rollback()
-        raise map_integrity_error(e, "Failed to delete game due to a database constraint")
+        raise map_integrity_error(e, "Echec de suppression du match (contrainte base de donnees)")
     except Exception as e:
         session.rollback()
-        raise HTTPException(500, f"Failed to delete game: {e}")
+        raise HTTPException(500, f"Echec de suppression du match : {e}")
 
     return None

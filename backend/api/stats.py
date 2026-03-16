@@ -17,7 +17,7 @@ router = APIRouter()
 @router.get("/{player_id}/history", response_model=List[GameRead])
 def get_player_games(player_id: int, session: Session = Depends(get_session)):
     if not session.get(Player, player_id):
-        raise HTTPException(404, "Player not found")
+        raise HTTPException(404, "Joueur introuvable")
     games = session.exec(
         select(Game)
         .options(selectinload(Game.teams).selectinload(Team.player))
@@ -45,10 +45,10 @@ def get_player_stats(
         session: Session = Depends(get_session),
 ):
     if not session.get(Player, player_id):
-        raise HTTPException(404, "Player not found")
+        raise HTTPException(404, "Joueur introuvable")
 
     if scope != "monthly" and month is not None:
-        raise HTTPException(422, "month is only supported when scope=monthly")
+        raise HTTPException(422, "month est supporte uniquement quand scope=monthly")
 
     try:
         start_dt, end_dt = get_scope_bounds(scope, year=year, month=month)

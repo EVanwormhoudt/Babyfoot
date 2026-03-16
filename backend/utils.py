@@ -27,7 +27,7 @@ def get_scope_bounds(
     if scope == "monthly":
         m = month or now.month
         if not 1 <= m <= 12:
-            raise ValueError("month must be in 1..12")
+            raise ValueError("month doit etre entre 1 et 12")
         start = datetime.datetime(y, m, 1, tzinfo=settings.tz)
         if m == 12:
             end = datetime.datetime(y + 1, 1, 1, tzinfo=settings.tz)
@@ -35,7 +35,7 @@ def get_scope_bounds(
             end = datetime.datetime(y, m + 1, 1, tzinfo=settings.tz)
         return start, end
 
-    raise ValueError("scope must be one of: overall, monthly, yearly")
+    raise ValueError("scope doit etre une de ces valeurs : overall, monthly, yearly")
 
 
 def get_win_streaks(
