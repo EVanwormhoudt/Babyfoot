@@ -256,6 +256,7 @@
             : 0
     );
     const recentHistory = $derived(chart.points.slice(-5));
+    const pointCount = $derived(chart.points.length);
     const hoveredPoint = $derived(
         hoveredPointIndex !== null && hoveredPointIndex >= 0 && hoveredPointIndex < chart.points.length
             ? chart.points[hoveredPointIndex]
@@ -429,14 +430,21 @@
                 </CardContent>
             </Card>
         {:else}
-            <Card>
-                <CardHeader>
-                    <CardTitle>{selectedPlayerName} rating history ({selectedScopeLabel})</CardTitle>
+            <Card class="border-emerald-500/20 bg-gradient-to-b from-emerald-950/20 to-background">
+                <CardHeader class="flex flex-row items-start justify-between gap-4">
+                    <div class="space-y-1">
+                        <CardTitle>{selectedPlayerName} rating history ({selectedScopeLabel})</CardTitle>
+                        <p class="text-xs text-muted-foreground">Evolution of Elo across recorded snapshots</p>
+                    </div>
+                    <div class="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
+                        {pointCount} points
+                    </div>
                 </CardHeader>
                 <CardContent class="space-y-3">
                     <svg
-                            class="h-64 w-full"
+                            class="h-72 w-full"
                             viewBox={`0 0 ${chart.width} ${chart.height}`}
+                            preserveAspectRatio="xMinYMin meet"
                             role="img"
                             aria-label={`${selectedPlayerName} rating history graph`}
                             onpointerleave={() => (hoveredPointIndex = null)}
@@ -480,6 +488,15 @@
                                 d={chart.areaPath}
                                 fill="url(#rating-history-green-fill)"
                                 stroke="none"
+                        />
+                        <path
+                                d={chart.path}
+                                fill="none"
+                                stroke={chartStroke}
+                                stroke-width="7"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                opacity="0.16"
                         />
                         <path
                                 d={chart.path}
@@ -529,44 +546,59 @@
                                         width={tooltipBox.width}
                                         height={tooltipBox.height}
                                         rx="10"
-                                        fill="white"
+                                        fill="hsl(var(--background))"
                                         stroke="#86efac"
                                         stroke-width="1.5"
-                                        opacity="0.98"
+                                        opacity="0.97"
                                 />
-                                <text x="12" y="20" fill="#14532d" class="text-[11px] font-semibold">
+                                <text x="12" y="20" fill="#a7f3d0" class="text-[11px] font-semibold">
                                     {hoveredPoint.dateLabel}
                                 </text>
-                                <text x="12" y="38" fill="#166534" class="text-[11px]">
+                                <text x="12" y="38" fill="#d1fae5" class="text-[11px]">
                                     Amount: {muAmount(hoveredPoint.mu)}
                                 </text>
-                                <text x="12" y="54" fill="#166534" class="text-[11px]">
+                                <text x="12" y="54" fill="#d1fae5" class="text-[11px]">
                                     Rank: {hoveredPoint.rank} ({hoveredPoint.rankType})
                                 </text>
-                                <text x="12" y="70" fill="#166534" class="text-[11px]">
+                                <text x="12" y="70" fill="#d1fae5" class="text-[11px]">
                                     Sigma: {hoveredPoint.sigma === null ? '—' : hoveredPoint.sigma.toFixed(1)}
                                 </text>
-                                <text x="12" y="86" fill="#166534" class="text-[11px]">
+                                <text x="12" y="86" fill="#d1fae5" class="text-[11px]">
                                     Δ prev: {hoveredDelta === null ? '—' : signed(hoveredDelta)}
                                 </text>
                             </g>
                         {/if}
                     </svg>
-                    <div class="flex justify-between text-xs text-muted-foreground">
+                    <div class="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{chart.startDate}</span>
+                        <span class="rounded-full border border-border/60 px-2 py-0.5">Range</span>
                         <span>{chart.endDate}</span>
                     </div>
-                    <div class="flex flex-wrap gap-4 text-xs">
-                        <span class="text-muted-foreground">Min amount: {muAmount(chart.minMu)}</span>
-                        <span class="text-muted-foreground">Max amount: {muAmount(chart.maxMu)}</span>
-                        <span class="font-semibold text-emerald-700">Current amount: {muAmount(chart.latestMu)}</span>
-                        <span class="font-medium text-emerald-700">Trend: {signed(trendDelta)}</span>
+                    <div class="grid grid-cols-2 gap-2 text-xs lg:grid-cols-4">
+                        <div class="rounded-lg border border-border/60 bg-background/70 p-2">
+                            <div class="text-muted-foreground">Min amount</div>
+                            <div class="mt-1 font-semibold">{muAmount(chart.minMu)}</div>
+                        </div>
+                        <div class="rounded-lg border border-border/60 bg-background/70 p-2">
+                            <div class="text-muted-foreground">Max amount</div>
+                            <div class="mt-1 font-semibold">{muAmount(chart.maxMu)}</div>
+                        </div>
+                        <div class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2">
+                            <div class="text-emerald-200/80">Current</div>
+                            <div class="mt-1 font-semibold text-emerald-300">{muAmount(chart.latestMu)}</div>
+                        </div>
+                        <div class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2">
+                            <div class="text-emerald-200/80">Trend</div>
+                            <div class="mt-1 font-semibold {trendDelta >= 0 ? 'text-emerald-300' : 'text-rose-300'}">
+                                {signed(trendDelta)}
+                            </div>
+                        </div>
                     </div>
                     <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                         {#each recentHistory as point}
-                            <div class="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-xs">
+                            <div class="rounded-lg border border-emerald-500/25 bg-emerald-950/15 px-2.5 py-2 text-xs">
                                 <div class="text-muted-foreground">{point.dateLabel}</div>
-                                <div class="font-semibold text-emerald-700">{muAmount(point.mu)}</div>
+                                <div class="mt-0.5 font-semibold text-emerald-300">{muAmount(point.mu)}</div>
                             </div>
                         {/each}
                     </div>

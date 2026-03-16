@@ -1,7 +1,4 @@
 <script lang="ts">
-    // Types aligned to your payload
-
-
     import {Button} from '$lib/components/ui/button';
     import {Card, CardContent, CardHeader, CardTitle} from '$lib/components/ui/card';
     import {Separator} from '$lib/components/ui/separator';
@@ -39,115 +36,111 @@
 
     const rowRating = (r: LeaderboardRow) => r?.mu ?? r?.rating?.mu_monthly;
     const rowWL = (r: LeaderboardRow) => `${r.wins ?? 0}-${Math.max(0, (r.games_played ?? 0) - (r.wins ?? 0))}`;
-
+    const ratingLabel = (r: LeaderboardRow) => {
+        const rating = rowRating(r);
+        return typeof rating === 'number' ? rating.toFixed(1) : '—';
+    };
+    const podiumClass = (idx: number) => {
+        if (idx === 0) return 'border-amber-400/45 bg-amber-500/10 text-amber-200';
+        if (idx === 1) return 'border-slate-400/45 bg-slate-500/10 text-slate-200';
+        return 'border-orange-400/45 bg-orange-500/10 text-orange-200';
+    };
 
 </script>
 
-<!-- HERO -->
-<section class="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
-    <h1 class="text-5xl font-bold mb-4 tracking-tight">BabyFoot MyDSO</h1>
-    <p class="mb-8 text-lg text-muted-foreground max-w-prose">
-        Track matches, view leaderboards, and analyze stats.
-    </p>
-    <div class="flex gap-3">
-        <Button href="/create" size="lg">Nouveau Match</Button>
-        <Button href="/leaderboard" size="lg" variant="outline">Voir le Classement</Button>
-    </div>
-</section>
+<div class="mx-auto max-w-[1400px] space-y-6 px-4 py-4">
+    <section
+            class="relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/20 via-background to-background/90 shadow-[0_18px_45px_rgba(0,0,0,0.25)]"
+    >
+        <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_45%)]"></div>
+        <div class="relative space-y-6 p-7 md:p-10">
+            <div class="space-y-3">
+                <p class="text-xs uppercase tracking-[0.2em] text-emerald-300/80">BabyFoot Dashboard</p>
+                <h1 class="text-4xl font-black tracking-tight sm:text-5xl">BabyFoot MyDSO</h1>
+                <p class="max-w-2xl text-muted-foreground">
+                    Track matches, follow leaderboard momentum, and analyze player performance.
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <Button class="rounded-xl bg-emerald-500 font-semibold text-black hover:bg-emerald-400" href="/create" size="lg">
+                    Nouveau Match
+                </Button>
+                <Button class="rounded-xl" href="/leaderboard" size="lg" variant="outline">
+                    Voir le Classement
+                </Button>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs">
+                <span class="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-muted-foreground">
+                    {data?.games?.length ?? 0} recent matches
+                </span>
+                <span class="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-muted-foreground">
+                    {data?.top3?.length ?? 0} top players this month
+                </span>
+            </div>
+        </div>
+    </section>
 
-<!-- QUICK GLANCE PANELS -->
-<section class="container mx-auto px-6 pb-16">
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <!-- Recent Matches -->
-        <Card class="lg:col-span-3">
-            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-4">
-                <CardTitle class="text-xl">Matchs Récents</CardTitle>
-                <Button class="h-8 px-2" href="/matches" variant="ghost">Voir tous</Button>
+    <section class="grid gap-4 xl:grid-cols-[2fr_1fr]">
+        <Card
+                class="overflow-hidden rounded-3xl border border-emerald-500/15 bg-gradient-to-br from-emerald-950/10 via-background to-background/90 shadow-[0_12px_32px_rgba(0,0,0,0.2)]"
+        >
+            <CardHeader class="flex flex-row items-center justify-between gap-3 pb-2">
+                <CardTitle class="text-xl font-semibold tracking-tight">Matchs Récents</CardTitle>
+                <Button class="h-8 rounded-lg px-3" href="/matches" variant="ghost">Voir tous</Button>
             </CardHeader>
             <CardContent>
                 {#if data?.games?.length}
-                    <ul class="divide-y rounded-lg overflow-hidden border">
+                    <ul class="space-y-2">
                         {#each data.games as g}
-                            <li class="even:bg-muted/40">
-                                <a class="block px-3 py-2.5 sm:px-4 sm:py-3" href={`/matches/${g.id}`}
-                                   aria-label="Open match details">
-                                    <!-- 5-col grid: time | team1 | A | B | team2 -->
-                                    <div
-                                            class="grid items-center gap-x-2 sm:gap-x-3
-           grid-cols-[auto_minmax(0,1fr)_auto_auto_minmax(0,1fr)]">
+                            <li>
+                                <a
+                                        class="group block rounded-2xl border border-border/60 bg-background/65 p-3 transition hover:border-emerald-500/35 hover:bg-emerald-500/10"
+                                        href={`/matches/${g.id}`}
+                                        aria-label="Open match details"
+                                >
+                                    <div class="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                                        <span>{dateDMY(g.game_timestamp)}</span>
+                                        <span>{timeHHMM(g.game_timestamp)}</span>
+                                    </div>
 
-                                        <!-- date + time -->
-                                        <div class="pr-1">
-                                            <p class="text-xs sm:text-sm tabular-nums leading-tight">{dateDMY(g.game_timestamp)}</p>
-                                            <p class="italic text-xs text-muted-foreground tabular-nums leading-tight">
-                                                {timeHHMM(g.game_timestamp)}
-                                            </p>
-                                        </div>
-
-                                        <!-- team 1 (added horizontal padding) -->
-                                        <div class="min-w-0 pl-20">
-                                            <div class="text-sm leading-snug ">
-                                                {#if teamPlayers(g, 1).length}
-                                                    {#each teamPlayers(g, 1).slice(0, 2) as p}
-                                                        <p class="truncate flex items-center gap-1.5">
-
-                                                            {nameOf(p)}
-                                                        </p>
-                                                    {/each}
-                                                    {#if teamPlayers(g, 1).length > 2}
-                                                        <p class="truncate text-muted-foreground text-[11px]">
-                                                            +{teamPlayers(g, 1).length - 2} more
-                                                        </p>
-                                                    {/if}
-                                                {:else}
-                                                    <p class="truncate">Team 1</p>
+                                    <div class="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+                                        <div class="min-w-0 space-y-1 text-right">
+                                            {#if teamPlayers(g, 1).length}
+                                                {#each teamPlayers(g, 1).slice(0, 2) as p}
+                                                    <p class="truncate text-sm">{nameOf(p)}</p>
+                                                {/each}
+                                                {#if teamPlayers(g, 1).length > 2}
+                                                    <p class="truncate text-[11px] text-muted-foreground">
+                                                        +{teamPlayers(g, 1).length - 2} more
+                                                    </p>
                                                 {/if}
-                                            </div>
-                                        </div>
-
-                                        <!-- score A (modern colors) -->
-                                        <div class="text-right pl-1">
-                                            {#if aWon(g) !== null}
-                                                <p class="text-xl sm:text-2xl font-extrabold tracking-tight tabular-nums
-                  {aWon(g) ? 'text-emerald-400' : 'text-white'}">
-                                                    {scoreA(g)}
-                                                </p>
                                             {:else}
-                                                <p class="text-lg font-bold tabular-nums">{scoreA(g)}</p>
+                                                <p class="truncate text-sm text-muted-foreground">Team 1</p>
                                             {/if}
                                         </div>
 
-                                        <!-- score B (modern colors, inverse) -->
-                                        <div class="text-left pr-1">
-                                            {#if aWon(g) !== null}
-                                                <p class="text-xl sm:text-2xl font-extrabold tracking-tight tabular-nums
-                  {aWon(g) ? 'text-white' : 'text-emerald-400'}">
-                                                    {scoreB(g)}
-                                                </p>
-                                            {:else}
-                                                <p class="text-lg font-bold tabular-nums">{scoreB(g)}</p>
-                                            {/if}
+                                        <div class="rounded-xl border border-border/60 bg-background/80 px-4 py-2 text-center shadow-inner">
+                                            <div class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Score</div>
+                                            <div class="mt-1 flex items-baseline justify-center gap-1.5 tabular-nums">
+                                                <span class="text-2xl font-black {aWon(g) === true ? 'text-emerald-400' : 'text-foreground/90'}">{scoreA(g)}</span>
+                                                <span class="text-muted-foreground">-</span>
+                                                <span class="text-2xl font-black {aWon(g) === false ? 'text-emerald-400' : 'text-foreground/90'}">{scoreB(g)}</span>
+                                            </div>
                                         </div>
 
-                                        <!-- team 2 (added horizontal padding) -->
-                                        <div class="min-w-0 text-right pr-20">
-                                            <div class="text-sm leading-snug">
-                                                {#if teamPlayers(g, 2).length}
-                                                    {#each teamPlayers(g, 2).slice(0, 2) as p}
-                                                        <p class="truncate flex items-center justify-end gap-1.5">
-                                                            <span class="truncate">{nameOf(p)}</span>
-
-                                                        </p>
-                                                    {/each}
-                                                    {#if teamPlayers(g, 2).length > 2}
-                                                        <p class="truncate text-muted-foreground text-[11px]">
-                                                            +{teamPlayers(g, 2).length - 2} more
-                                                        </p>
-                                                    {/if}
-                                                {:else}
-                                                    <p class="truncate">Team 2</p>
+                                        <div class="min-w-0 space-y-1">
+                                            {#if teamPlayers(g, 2).length}
+                                                {#each teamPlayers(g, 2).slice(0, 2) as p}
+                                                    <p class="truncate text-sm">{nameOf(p)}</p>
+                                                {/each}
+                                                {#if teamPlayers(g, 2).length > 2}
+                                                    <p class="truncate text-[11px] text-muted-foreground">
+                                                        +{teamPlayers(g, 2).length - 2} more
+                                                    </p>
                                                 {/if}
-                                            </div>
+                                            {:else}
+                                                <p class="truncate text-sm text-muted-foreground">Team 2</p>
+                                            {/if}
                                         </div>
                                     </div>
                                 </a>
@@ -155,56 +148,51 @@
                         {/each}
                     </ul>
                 {:else}
-                    <p class="text-sm text-muted-foreground">No matches yet. Be the first to create one!</p>
+                    <div class="rounded-2xl border border-dashed border-border/60 bg-background/40 py-10 text-center text-sm text-muted-foreground">
+                        No matches yet. Be the first to create one.
+                    </div>
                 {/if}
             </CardContent>
         </Card>
 
-        <!-- Top 3 Leaderboard -->
-        <Card class="lg:col-span-2">
-            <CardHeader class="pb-4">
-                <CardTitle class="text-xl">Top Players (du mois)</CardTitle>
+        <Card class="rounded-3xl border border-blue-500/20 bg-gradient-to-b from-blue-950/18 to-background shadow-[0_12px_30px_rgba(0,0,0,0.2)]">
+            <CardHeader class="pb-2">
+                <CardTitle class="text-xl font-semibold tracking-tight">Top Players (du mois)</CardTitle>
             </CardHeader>
             <CardContent>
                 {#if data?.top3?.length}
-                    <ol class="space-y-4">
+                    <ol class="space-y-2">
                         {#each data.top3 as row, idx}
-                            <li class="flex items-center justify-between rounded-2xl border p-3">
-                                <div class="flex items-center gap-3 min-w-0">
-                                    <div class="w-9 h-9 rounded-full grid place-items-center border">
-                                        <span class="text-sm font-semibold">#{idx + 1}</span>
+                            <li class="rounded-2xl border border-border/60 bg-background/70 p-3 transition hover:border-emerald-500/35 hover:bg-emerald-500/10">
+                                <a class="flex items-center justify-between gap-3" href={`/stats?player_id=${row.id}&scope=overall`}>
+                                    <div class="flex min-w-0 items-center gap-3">
+                                        <div class="grid h-10 w-10 place-items-center rounded-xl border text-sm font-semibold {podiumClass(idx)}">
+                                            #{idx + 1}
+                                        </div>
+                                        <div class="min-w-0">
+                                            <p class="truncate font-medium">{rowName(row)}</p>
+                                            <p class="text-xs text-muted-foreground">W-L: {rowWL(row)}</p>
+                                        </div>
                                     </div>
-                                    <div class="min-w-0">
-                                        <p class="font-medium truncate">{rowName(row)}</p>
-                                        <p class="text-xs text-muted-foreground">
-                                            {#if rowWL(row)}
-                                                W–L: {rowWL(row)}
-                                            {:else}
-                                                &nbsp;
-                                            {/if}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    {#if rowRating(row) !== undefined}
-                                        <p class="font-semibold tabular-nums">{rowRating(row)}</p>
+                                    <div class="text-right">
+                                        <p class="font-semibold tabular-nums">{ratingLabel(row)}</p>
                                         <p class="text-xs text-muted-foreground">Rating</p>
-                                    {:else}
-                                        <p class="text-xs text-muted-foreground">—</p>
-                                    {/if}
-                                </div>
+                                    </div>
+                                </a>
                             </li>
                         {/each}
                     </ol>
 
                     <Separator class="my-4"/>
                     <div class="flex justify-end">
-                        <Button href="/leaderboard" size="sm" variant="outline">Classement entier</Button>
+                        <Button class="rounded-lg" href="/leaderboard" size="sm" variant="outline">Classement entier</Button>
                     </div>
                 {:else}
-                    <p class="text-sm text-muted-foreground">Pas encore de classement.</p>
+                    <div class="rounded-2xl border border-dashed border-border/60 bg-background/40 py-10 text-center text-sm text-muted-foreground">
+                        Pas encore de classement.
+                    </div>
                 {/if}
             </CardContent>
         </Card>
-    </div>
-</section>
+    </section>
+</div>

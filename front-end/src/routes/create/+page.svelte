@@ -215,176 +215,190 @@
     }
 </script>
 
-<div class="create-match">
-    <!-- Players Pool -->
-    <div class="p-6 rounded-md shadow-md text-center mb-6 bg-card margin-top">
-        <h2 class="text-2xl font-bold text-white mb-4">Joueurs</h2>
-
-        <section
-                class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 justify-center auto-rows-fixed"
-                use:dndzone={{
+<div class="create-match mx-auto max-w-[1400px] space-y-6 px-4 py-4">
+    <Card.Root class="overflow-hidden rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/15 via-background to-background/95 shadow-[0_18px_45px_rgba(0,0,0,0.25)]">
+        <Card.Header class="relative pb-2">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.15),transparent_45%)]"></div>
+            <div class="relative flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <Card.Title class="text-3xl font-black tracking-tight">Create Match</Card.Title>
+                    <Card.Description>Drag players into red and blue teams, then submit the score.</Card.Description>
+                </div>
+                <div class="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+                    {columnItems[0].items.length} players available
+                </div>
+            </div>
+        </Card.Header>
+        <Card.Content class="pt-2">
+            <section
+                    class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+                    use:dndzone={{
 				items: columnItems[0].items,
 				type: 'player',
-
 				flipDurationMs,
 				dropTargetStyle: dropTargetStyleMain,
 				transformDraggedElement
 			}}
-                onconsider={(e) => handleDndConsiderCards(columnItems[0].id, e)}
-                onfinalize={(e) => handleDndFinalizeCards(columnItems[0].id, e)}
-                style="height: {height};"
-        >
-            {#each columnItems[0].items as item (item.id)}
-                <div
-                        class="relative group border-2 border-gray-300 rounded-md px-3 py-2 text-gray-300 flex items-center justify-between cursor-grab shadow-sm hover:bg-gray-300 hover:text-black transition h-11 w-64"
-                        title={item.name}
-                >
-                    <div class="flex items-center gap-2">
+                    onconsider={(e) => handleDndConsiderCards(columnItems[0].id, e)}
+                    onfinalize={(e) => handleDndFinalizeCards(columnItems[0].id, e)}
+                    style="height: {height};"
+            >
+                {#each columnItems[0].items as item (item.id)}
+                    <div
+                            class="relative group h-12 rounded-xl border border-border/70 bg-background/80 px-3 text-sm text-foreground/90 shadow-sm transition hover:border-emerald-500/50 hover:bg-emerald-500/10"
+                            title={item.name}
+                    >
+                        <div class="flex h-full items-center justify-between gap-2">
+                            <span class="truncate">{item.name}</span>
+                            <span class="text-muted-foreground">⠿</span>
+                        </div>
 
-                        <span>{item.name}</span>
+                        <div class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                            <button
+                                    class="h-6 w-6 rounded-full bg-red-700 text-white text-[10px] font-semibold grid place-items-center shadow"
+                                    title="Send to Red"
+                                    onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
+                            >R</button>
+                            <button
+                                    class="h-6 w-6 rounded-full bg-blue-700 text-white text-[10px] font-semibold grid place-items-center shadow"
+                                    title="Send to Blue"
+                                    onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
+                            >B</button>
+                        </div>
                     </div>
+                {/each}
+            </section>
+        </Card.Content>
+    </Card.Root>
 
-                    <!-- hover quick actions -->
-                    <div class="absolute inset-0 flex items-center justify-end gap-2 pr-2 opacity-0 group-hover:opacity-100 transition pointer-events-none">
-                        <button
-                                class="pointer-events-auto h-7 w-7 rounded-full bg-red-900 text-white text-xs font-semibold grid place-items-center shadow"
-                                title="Send to Red"
-                                onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
-                        >R</button>
-                        <button
-                                class="pointer-events-auto h-7 w-7 rounded-full bg-blue-900 text-white text-xs font-semibold grid place-items-center shadow"
-                                title="Send to Blue"
-                                onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
-                        >B</button>
-                    </div>
-
-                    <span class="ml-2 text-gray-400">⠿</span>
-                </div>
-            {/each}
-        </section>
-    </div>
-
-    <div class="flex flex-wrap gap-4 justify-center items-start">
-        <!-- Red Team -->
+    <div class="grid items-start gap-4 xl:grid-cols-[1fr_420px_1fr]">
         {#each columnItems.slice(1, 2) as column (column.id)}
-            <section class="flex-1 team-red p-4 rounded-xl shadow-md min-h-[300px] max-w-[350px] bg-red-900/10">
-                <div class="text-lg font-semibold mb-2 text-foreground">{column.name}</div>
-                <div
-                        class="flex flex-col gap-2 min-h-[200px] max-h-[200px] overflow-scroll"
-                        use:dndzone={{
+            <Card.Root class="rounded-3xl border border-red-500/25 bg-gradient-to-b from-red-950/20 to-background">
+                <Card.Header class="pb-2">
+                    <div class="flex items-center justify-between">
+                        <Card.Title class="text-xl">Red Team</Card.Title>
+                        <span class="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 text-xs text-red-200">
+                            {column.items.length} players
+                        </span>
+                    </div>
+                </Card.Header>
+                <Card.Content>
+                    <div
+                            class="grid min-h-[220px] max-h-[440px] gap-2 overflow-y-auto rounded-xl border border-border/60 bg-background/60 p-2"
+                            use:dndzone={{
 						items: column.items,
 						type: 'player',
-
 						flipDurationMs,
 						dropTargetStyle,
 						transformDraggedElement
 					}}
-                        onconsider={(e) => handleDndConsiderCards(column.id, e)}
-                        onfinalize={(e) => handleDndFinalizeCards(column.id, e)}
-                >
-                    {#each column.items as item (item.id)}
-                        <div class="relative group border-1 border-gray-300 rounded-md px-3 py-2 flex items-center justify-between cursor-grab shadow-sm hover:bg-gray-300 hover:text-black transition h-11 w-64">
-                            <div class="flex items-center gap-2">
+                            onconsider={(e) => handleDndConsiderCards(column.id, e)}
+                            onfinalize={(e) => handleDndFinalizeCards(column.id, e)}
+                    >
+                        {#each column.items as item (item.id)}
+                            <div class="relative group h-12 rounded-xl border border-border/70 bg-background/85 px-3 text-sm text-foreground/90 transition hover:border-blue-500/40 hover:bg-blue-500/10">
+                                <div class="flex h-full items-center justify-between gap-2">
+                                    <span class="truncate">{item.name}</span>
+                                    <span class="text-muted-foreground">⠿</span>
+                                </div>
 
-                                <span>{item.name}</span>
+                                <div class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                                    <button
+                                            class="h-6 w-6 rounded-full bg-blue-700 text-white text-[10px] font-semibold grid place-items-center shadow"
+                                            title="Move to Blue"
+                                            onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
+                                    >B</button>
+                                    <button
+                                            class="h-6 w-6 rounded-full bg-neutral-700 text-white text-[10px] font-semibold grid place-items-center shadow"
+                                            title="Back to players"
+                                            onclick={withNoDrag(() => moveItemToColumn(item.id, COL_PLAYERS))}
+                                    >X</button>
+                                </div>
                             </div>
-
-                            <div class="absolute inset-0 flex items-center justify-end gap-2 pr-2 opacity-0 group-hover:opacity-100 transition pointer-events-none">
-                                <button
-                                        class="pointer-events-auto h-7 w-7 rounded-full bg-blue-600 text-white text-xs font-semibold grid place-items-center shadow"
-                                        title="Move to Blue"
-                                        onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
-                                >B</button>
-                                <button
-                                        class="pointer-events-auto h-7 w-7 rounded-full bg-neutral-700 text-white text-xs font-semibold grid place-items-center shadow"
-                                        title="Back to Joueurs"
-                                        onclick={withNoDrag(() => moveItemToColumn(item.id, COL_PLAYERS))}
-                                >X</button>
-                            </div>
-
-                            <span class="ml-2 text-gray-400">⠿</span>
-                        </div>
-                    {/each}
-                </div>
-            </section>
+                        {/each}
+                    </div>
+                </Card.Content>
+            </Card.Root>
         {/each}
 
-        <!-- Score Input Section -->
-        <Card.Root class="w-[400px]">
+        <Card.Root class="rounded-3xl border border-emerald-500/25 bg-gradient-to-b from-emerald-950/18 to-background">
             <Card.Header>
-                <Card.Title>Soummetre le score</Card.Title>
-                <Card.Description>Entrer le score des deux equipes</Card.Description>
+                <Card.Title class="text-xl">Submit Score</Card.Title>
+                <Card.Description>Enter the final score for both teams.</Card.Description>
             </Card.Header>
             <Card.Content>
-                <div class="flex justify-around gap-6">
-                    <div class="flex flex-col items-center gap-y-2">
-                        <Label class="text-foreground" for="redScore">Score des rouges</Label>
-                        <Input id="redScore" type="number" bind:value={redScore} class="w-24" placeholder="0" max={10} min={0}/>
+                <div class="grid grid-cols-[1fr_auto_1fr] items-end gap-4">
+                    <div class="space-y-2 text-center">
+                        <Label class="text-foreground/90" for="redScore">Red score</Label>
+                        <Input id="redScore" type="number" bind:value={redScore} class="h-12 text-center text-lg font-semibold" placeholder="0" max={10} min={0}/>
                     </div>
-                    <div class="flex flex-col items-center">
-                        <br />
-                        <Label class="text-foreground">VS</Label>
-                    </div>
-                    <div class="flex flex-col items-center gap-y-2">
-                        <Label class="text-foreground" for="blueScore">Score des bleus</Label>
-                        <Input id="blueScore" type="number" bind:value={blueScore} class="w-24" placeholder="0" max={10} min={0}/>
+                    <div class="pb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">VS</div>
+                    <div class="space-y-2 text-center">
+                        <Label class="text-foreground/90" for="blueScore">Blue score</Label>
+                        <Input id="blueScore" type="number" bind:value={blueScore} class="h-12 text-center text-lg font-semibold" placeholder="0" max={10} min={0}/>
                     </div>
                 </div>
             </Card.Content>
-            <Card.Footer class="flex flex-col items-center gap-2">
-                <Button onclick={submitScore} disabled={submitting}>
-                    {submitting ? 'Sending…' : 'Send Score'}
+            <Card.Footer class="flex flex-col items-center gap-2 pt-0">
+                <Button class="h-11 min-w-[170px] rounded-xl bg-emerald-500 text-black font-semibold hover:bg-emerald-400" onclick={submitScore} disabled={submitting}>
+                    {submitting ? 'Submitting…' : 'Send Score'}
                 </Button>
             </Card.Footer>
         </Card.Root>
 
-        <!-- Blue Team -->
         {#each columnItems.slice(2, 3) as column (column.id)}
-            <div class="flex-1 team-blue p-4 rounded-xl shadow-md min-h-[300px] max-w-[350px] bg-blue-900/10">
-                <div class="text-lg font-semibold mb-2 text-foreground">{column.name}</div>
-                <div
-                        class="flex flex-col gap-2 min-h-[200px] max-h-[200px] overflow-scroll"
-                        use:dndzone={{
+            <Card.Root class="rounded-3xl border border-blue-500/25 bg-gradient-to-b from-blue-950/20 to-background">
+                <Card.Header class="pb-2">
+                    <div class="flex items-center justify-between">
+                        <Card.Title class="text-xl">Blue Team</Card.Title>
+                        <span class="rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-xs text-blue-200">
+                            {column.items.length} players
+                        </span>
+                    </div>
+                </Card.Header>
+                <Card.Content>
+                    <div
+                            class="grid min-h-[220px] max-h-[440px] gap-2 overflow-y-auto rounded-xl border border-border/60 bg-background/60 p-2"
+                            use:dndzone={{
 						items: column.items,
 						type: 'player',
-
 						flipDurationMs,
 						dropTargetStyle,
 						transformDraggedElement
 					}}
-                        onconsider={(e) => handleDndConsiderCards(column.id, e)}
-                        onfinalize={(e) => handleDndFinalizeCards(column.id, e)}
-                >
-                    {#each column.items as item (item.id)}
-                        <div class="relative group border-2 text-foreground border-gray-300 rounded-md px-3 py-2 flex items-center justify-between cursor-grab shadow-sm hover:bg-gray-300 hover:text-black transition h-11 w-64">
-                            <div class="flex items-center gap-2">
-                                
-                                <span>{item.name}</span>
-                            </div>
+                            onconsider={(e) => handleDndConsiderCards(column.id, e)}
+                            onfinalize={(e) => handleDndFinalizeCards(column.id, e)}
+                    >
+                        {#each column.items as item (item.id)}
+                            <div class="relative group h-12 rounded-xl border border-border/70 bg-background/85 px-3 text-sm text-foreground/90 transition hover:border-red-500/40 hover:bg-red-500/10">
+                                <div class="flex h-full items-center justify-between gap-2">
+                                    <span class="truncate">{item.name}</span>
+                                    <span class="text-muted-foreground">⠿</span>
+                                </div>
 
-                            <div class="absolute inset-0 flex items-center justify-end gap-2 pr-2 opacity-0 group-hover:opacity-100 transition pointer-events-none">
-                                <button
-                                        class="pointer-events-auto h-7 w-7 rounded-full bg-red-600 text-white text-xs font-semibold grid place-items-center shadow"
-                                        title="Move to Red"
-                                        onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
-                                >R</button>
-                                <button
-                                        class="pointer-events-auto h-7 w-7 rounded-full bg-neutral-700 text-white text-xs font-semibold grid place-items-center shadow"
-                                        title="Back to Joueurs"
-                                        onclick={withNoDrag(() => moveItemToColumn(item.id, COL_PLAYERS))}
-                                >X</button>
+                                <div class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                                    <button
+                                            class="h-6 w-6 rounded-full bg-red-700 text-white text-[10px] font-semibold grid place-items-center shadow"
+                                            title="Move to Red"
+                                            onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
+                                    >R</button>
+                                    <button
+                                            class="h-6 w-6 rounded-full bg-neutral-700 text-white text-[10px] font-semibold grid place-items-center shadow"
+                                            title="Back to players"
+                                            onclick={withNoDrag(() => moveItemToColumn(item.id, COL_PLAYERS))}
+                                    >X</button>
+                                </div>
                             </div>
-
-                            <span class="ml-2 text-gray-400">⠿</span>
-                        </div>
-                    {/each}
-                </div>
-            </div>
+                        {/each}
+                    </div>
+                </Card.Content>
+            </Card.Root>
         {/each}
     </div>
 </div>
 
 <style>
-    .create-match { margin: 2%; }
-    section { overflow: scroll; }
+    .create-match section {
+        overflow: auto;
+    }
 </style>

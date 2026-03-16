@@ -6,13 +6,12 @@
     // shadcn-svelte components
     import * as Card from "$lib/components/ui/card/index.js";
     import {Button} from "$lib/components/ui/button/index.js";
-    import * as Select from "$lib/components/ui/select/index.js";
     import * as Pagination from "$lib/components/ui/pagination/index.js";
     import {RangeCalendar} from "$lib/components/ui/range-calendar/index.js";
     import {Badge} from "$lib/components/ui/badge/index.js";
     import * as Popover from "$lib/components/ui/popover/index.js";
     import {goto} from "$app/navigation";
-    import {parseDate, today, getLocalTimeZone, CalendarDate, type DateValue} from "@internationalized/date";
+    import {today, getLocalTimeZone, CalendarDate, type DateValue} from "@internationalized/date";
     import {page} from '$app/state';
 
 
@@ -76,6 +75,18 @@
         return `/stats?player_id=${playerId}&scope=overall`;
     }
 
+    function teamPanelClass(won: boolean) {
+        return won
+            ? 'border-emerald-500/30 bg-emerald-500/10'
+            : 'border-border/60 bg-background/60';
+    }
+
+    function playerChipClass(won: boolean) {
+        return won
+            ? 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-400/25'
+            : 'bg-muted/70 text-foreground/85 ring-1 ring-border/60';
+    }
+
     function deltaClass(delta: number) {
         if (delta > 0) return 'text-emerald-400';
         if (delta < 0) return 'text-rose-400';
@@ -90,7 +101,6 @@
     }
 
     async function clearDates() {
-        console.log("clearDates");
         const sp = new URLSearchParams(page.url.searchParams);
         sp.delete("start_date");
         sp.delete("end_date");
@@ -119,23 +129,26 @@
 </script>
 
 <!-- Filters -->
-<div class="space-y-4 mb-6 mt-3 ">
-    <div class="flex items-center gap-2 justify-end mr-6 ">
-        <Popover.Root>
-            <Popover.Trigger>
-                <Button class="w-[260px] justify-start font-normal" variant="outline">
-                    {labelFromRange(range)}
-                </Button>
-            </Popover.Trigger>
-            <Popover.Content class="p-0">
-                <!-- bind:value fires as the user picks dates;
-                     our reactive block above triggers navigation when both ends exist -->
-                <RangeCalendar bind:value={range} class="rounded-md border"/>
-            </Popover.Content>
-        </Popover.Root>
-        <Button onclick={() => setMonth(0)} variant="secondary">Ce mois</Button>
-        <Button onclick={() => setMonth(-1)} variant="ghost">Mois Précédent</Button>
-        <Button onclick={clearDates} variant="destructive">Effacer</Button>
+<div class="mb-6 mt-3 rounded-2xl border border-border/60 bg-background/60 p-3">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <p class="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Match Filters</p>
+        <div class="flex flex-wrap items-center gap-2">
+            <Popover.Root>
+                <Popover.Trigger>
+                    <Button class="w-[260px] justify-start font-normal" variant="outline">
+                        {labelFromRange(range)}
+                    </Button>
+                </Popover.Trigger>
+                <Popover.Content class="p-0">
+                    <!-- bind:value fires as the user picks dates;
+                         our reactive block above triggers navigation when both ends exist -->
+                    <RangeCalendar bind:value={range} class="rounded-md border"/>
+                </Popover.Content>
+            </Popover.Root>
+            <Button onclick={() => setMonth(0)} variant="secondary">This month</Button>
+            <Button onclick={() => setMonth(-1)} variant="ghost">Previous month</Button>
+            <Button onclick={clearDates} variant="destructive">Clear</Button>
+        </div>
     </div>
 </div>
 
@@ -157,69 +170,84 @@
             {@const t2Wins = s2 > s1}
 
             <Card.Root
-                    class="relative overflow-hidden rounded-2xl border border-border/60 bg-background transition hover:shadow-lg">
-                <!-- date -->
-                <Card.Header class="items-center pb-0">
+                    class="group relative overflow-hidden rounded-3xl border border-emerald-500/15 bg-gradient-to-br from-emerald-950/10 via-background to-background/90 shadow-[0_10px_32px_rgba(0,0,0,0.2)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(16,185,129,0.16)]">
+                <div
+                        class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.15),transparent_45%)]"></div>
+
+                <Card.Header class="relative flex flex-row items-center justify-between gap-3 pb-1">
                     <Badge variant="secondary" class="text-xs">{toLocal(game.game_timestamp)}</Badge>
+                    <span class="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Match #{game.id}</span>
                 </Card.Header>
 
-                <Card.Content class="pt-4">
-                    <!-- players flanking the score -->
-                    <div class="flex items-center justify-between gap-3">
-                        <!-- LEFT team chips (tight to score) -->
-                        <div class="flex flex-wrap gap-2 max-w-[45%] justify-end">
-                            {#each t1 as m}
-                                {@const mmrChange = getOverallChange(game, m.player_id)}
-                                <div class="inline-flex flex-col items-end gap-1">
-                                    <Badge class="rounded-full px-3 py-1
-                            {t1Wins ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-400/25' : 'bg-muted text-foreground/80 ring-1 ring-border/50'}">
-                                        <a href={statsHref(m.player_id)} class="hover:underline">
-                                            {m.player.player_name ?? `P${m.player.id}`}
+                <Card.Content class="relative pt-3">
+                    <div class="grid grid-cols-1 items-stretch gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
+                        <div class="rounded-2xl border px-3 py-3 {teamPanelClass(t1Wins)}">
+                            <div class="mb-2 flex items-center justify-between">
+                                <span class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Team 1</span>
+                                {#if t1Wins}
+                                    <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">Winner</span>
+                                {/if}
+                            </div>
+                            <div class="flex flex-wrap gap-2 md:justify-end">
+                                {#each t1 as m}
+                                    {@const mmrChange = getOverallChange(game, m.player_id)}
+                                    <div class="inline-flex min-w-[92px] flex-col items-end gap-1">
+                                        <a
+                                                href={statsHref(m.player_id)}
+                                                class="inline-flex max-w-full rounded-full px-3 py-1 text-sm font-medium transition hover:brightness-110 {playerChipClass(t1Wins)}"
+                                        >
+                                            <span class="truncate">{m.player.player_name ?? `P${m.player.id}`}</span>
                                         </a>
-                                    </Badge>
-                                    {#if mmrChange}
-                                        <div class="text-[10px] leading-none inline-flex items-center gap-1">
-                                            <span class="text-muted-foreground">{formatElo(mmrChange.muAfter)}</span>
-                                            <span class="font-semibold {deltaClass(mmrChange.delta)}">
-                                                {formatDelta(mmrChange.delta)}
-                                            </span>
-                                        </div>
-                                    {/if}
-                                </div>
-                            {/each}
+                                        {#if mmrChange}
+                                            <div class="text-[10px] leading-none inline-flex items-center gap-1.5">
+                                                <span class="text-muted-foreground">{formatElo(mmrChange.muAfter)}</span>
+                                                <span class="font-semibold {deltaClass(mmrChange.delta)}">
+                                                    {formatDelta(mmrChange.delta)}
+                                                </span>
+                                            </div>
+                                        {/if}
+                                    </div>
+                                {/each}
+                            </div>
                         </div>
 
-                        <!-- SCORE -->
-                        <div class="flex items-baseline gap-2 shrink-0">
-        <span class="text-3xl font-extrabold leading-none
-                     {t1Wins ? 'text-emerald-400' : 'text-foreground/90'}">{s1}</span>
-                            <span class="text-muted-foreground">–</span>
-                            <span class="text-3xl font-extrabold leading-none
-                     {t2Wins ? 'text-emerald-400' : 'text-foreground/90'}">{s2}</span>
+                        <div class="rounded-2xl border border-border/60 bg-background/80 px-5 py-4 text-center shadow-inner">
+                            <div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Final score</div>
+                            <div class="mt-1 flex items-baseline justify-center gap-2">
+                                <span class="text-4xl font-black leading-none {t1Wins ? 'text-emerald-400' : 'text-foreground/90'}">{s1}</span>
+                                <span class="text-muted-foreground">–</span>
+                                <span class="text-4xl font-black leading-none {t2Wins ? 'text-emerald-400' : 'text-foreground/90'}">{s2}</span>
+                            </div>
                         </div>
 
-                        <!-- RIGHT team chips (tight to score) -->
-                        <div class="flex flex-wrap gap-2 max-w-[45%]">
-                            {#each t2 as m}
-                                {@const mmrChange = getOverallChange(game, m.player_id)}
-                                <div class="inline-flex flex-col items-start gap-1">
-                                    <Badge class="rounded-full px-3 py-1
-                            {t2Wins ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-400/25' : 'bg-muted text-foreground/80 ring-1 ring-border/50'}">
-                                        <a href={statsHref(m.player_id)} class="hover:underline">
-                                            {m.player.player_name ?? `P${m.player.id}`}
+                        <div class="rounded-2xl border px-3 py-3 {teamPanelClass(t2Wins)}">
+                            <div class="mb-2 flex items-center justify-between">
+                                <span class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Team 2</span>
+                                {#if t2Wins}
+                                    <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">Winner</span>
+                                {/if}
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                {#each t2 as m}
+                                    {@const mmrChange = getOverallChange(game, m.player_id)}
+                                    <div class="inline-flex min-w-[92px] flex-col items-start gap-1">
+                                        <a
+                                                href={statsHref(m.player_id)}
+                                                class="inline-flex max-w-full rounded-full px-3 py-1 text-sm font-medium transition hover:brightness-110 {playerChipClass(t2Wins)}"
+                                        >
+                                            <span class="truncate">{m.player.player_name ?? `P${m.player.id}`}</span>
                                         </a>
-                                    </Badge>
-                                    {#if mmrChange}
-                                        <div class="text-[10px] leading-none inline-flex items-center gap-1">
-
-                                            <span class="text-muted-foreground">{formatElo(mmrChange.muAfter)}</span>
-                                            <span class="font-semibold {deltaClass(mmrChange.delta)}">
-                                                {formatDelta(mmrChange.delta)}
-                                            </span>
-                                        </div>
-                                    {/if}
-                                </div>
-                            {/each}
+                                        {#if mmrChange}
+                                            <div class="text-[10px] leading-none inline-flex items-center gap-1.5">
+                                                <span class="text-muted-foreground">{formatElo(mmrChange.muAfter)}</span>
+                                                <span class="font-semibold {deltaClass(mmrChange.delta)}">
+                                                    {formatDelta(mmrChange.delta)}
+                                                </span>
+                                            </div>
+                                        {/if}
+                                    </div>
+                                {/each}
+                            </div>
                         </div>
                     </div>
                 </Card.Content>
