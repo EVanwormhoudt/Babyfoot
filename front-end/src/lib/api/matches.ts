@@ -29,7 +29,7 @@ export async function getGames(
     });
     if (!res.ok) {
         const text = await res.text().catch(() => '');
-        throw new Error(`Failed to load games (${res.status}) ${text}`);
+        throw new Error(`Impossible de charger les matchs (${res.status}) ${text}`);
     }
     return await res.json() as { items: GameRead[]; total: number };
 }

@@ -13,7 +13,7 @@
         {href: '/leaderboard', label: 'Classement'},
         {href: '/matches', label: 'Matchs'},
         {href: '/create', label: 'Nouveau'},
-        {href: '/stats', label: 'Stats'}
+        {href: '/stats', label: 'Statistiques'}
     ];
 
     function isActive(href: string) {

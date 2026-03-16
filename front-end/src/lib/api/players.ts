@@ -37,7 +37,7 @@ export async function getPlayers(eventFetch?: F) {
     const f = eventFetch ?? fetch;
     // If you can, add a fields param on the backend to keep this light
     const res = await f(`${PUBLIC_API_BASE}/api/players`); // e.g. ...?fields=id,name,color,active
-    if (!res.ok) throw new Error('Failed to load players');
+    if (!res.ok) throw new Error('Impossible de charger les joueurs');
     return res.json() as Promise<Array<{ id: number; player_name: string; player_color: string; active?: boolean }>>;
 }
 
@@ -96,7 +96,7 @@ export async function getPlayerRatingHistory(
 
     const res = await f(url);
     if (!res.ok) {
-        throw new Error(`Failed to load rating history (${res.status})`);
+        throw new Error(`Impossible de charger l'historique Elo (${res.status})`);
     }
     return res.json() as Promise<PlayerRatingHistoryPoint[]>;
 }
@@ -122,7 +122,7 @@ export async function getLeaderboard(
     }
 
     const res = await f(`${PUBLIC_API_BASE}/api/players/leaderboard?${params.toString()}`);
-    if (!res.ok) throw new Error(`Failed to load leaderboard: ${res.status}`);
+    if (!res.ok) throw new Error(`Impossible de charger le classement : ${res.status}`);
     return res.json();
 }
 
@@ -147,7 +147,7 @@ export async function getPlayerStats(
 
     const res = await f(`${PUBLIC_API_BASE}/api/players/${id}/stats?${params.toString()}`);
     if (!res.ok) {
-        throw new Error(`Failed to load player stats (${res.status})`);
+        throw new Error(`Impossible de charger les statistiques joueur (${res.status})`);
     }
     return res.json() as Promise<PlayerStats>;
 }

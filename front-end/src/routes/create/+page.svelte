@@ -113,7 +113,7 @@
 
     async function undoLastSubmission() {
         if (!lastGameId) {
-            toast.error("Undo unavailable (no game id).");
+            toast.error("Annulation impossible (aucun identifiant de match).");
             return;
         }
         try {
@@ -122,13 +122,13 @@
                     const res = await fetch(`${GAMES_ENDPOINT}/${lastGameId}`, {method: "DELETE"});
                     if (!res.ok) {
                         const t = await res.text().catch(() => "");
-                        throw new Error(t || `Undo failed (${res.status})`);
+                        throw new Error(t || `Echec de l'annulation (${res.status})`);
                     }
                 })(),
                 {
-                    loading: "Undoing…",
-                    success: "Submission undone.",
-                    error: (e: unknown) => e instanceof Error ? e.message : "Failed to undo."
+                    loading: "Annulation...",
+                    success: "Enregistrement annule.",
+                    error: (e: unknown) => e instanceof Error ? e.message : "Echec de l'annulation."
                 }
             );
             lastGameId = null;
@@ -141,37 +141,37 @@
         const r = typeof redScore === 'number' ? redScore : Number(redScore);
         const b = typeof blueScore === 'number' ? blueScore : Number(blueScore);
         if (!Number.isFinite(r) || !Number.isFinite(b)) {
-            toast.error("Please enter numeric scores.");
+            toast.error("Veuillez entrer des scores numeriques.");
             return;
         }
 
         const redCol = columnItems.find(c => c.id === COL_RED);
         const blueCol = columnItems.find(c => c.id === COL_BLUE);
         if (!redCol || !blueCol) {
-            toast.error('Teams not initialized.');
+            toast.error('Les equipes ne sont pas initialisees.');
             return;
         }
 
         const redEmpty = redCol.items.length === 0;
         const blueEmpty = blueCol.items.length === 0;
         if (redEmpty && blueEmpty) {
-            toast.error('Both teams are empty. Add players to Red and Blue.');
+            toast.error('Les deux equipes sont vides. Ajoutez des joueurs en rouge et en bleu.');
             return;
         }
         if (redEmpty) {
-            toast.error('Red team is empty. Drag or quick-move a player.');
+            toast.error("L'equipe rouge est vide. Glissez un joueur ou utilisez les actions rapides.");
             return;
         }
         if (blueEmpty) {
-            toast.error('Blue team is empty. Drag or quick-move a player.');
+            toast.error("L'equipe bleue est vide. Glissez un joueur ou utilisez les actions rapides.");
             return;
         }
         if (r === b) {
-            toast.error('Scores cannot be the same.');
+            toast.error('Les scores ne peuvent pas etre egaux.');
             return;
         }
         if (r < 0 || b < 0) {
-            toast.error('Scores cannot be negative.');
+            toast.error('Les scores ne peuvent pas etre negatifs.');
             return;
         }
 
@@ -191,16 +191,16 @@
                 });
                 if (!res.ok) {
                     const text = await res.text().catch(() => "");
-                    throw new Error(text || `Request failed with ${res.status}`);
+                    throw new Error(text || `La requete a echoue (${res.status})`);
                 }
                 return await res.json().catch(() => ({}));
             })();
 
             // Show success with Undo action
             lastGameId = Number.isFinite(Number(data?.id)) ? Number(data.id) : null;
-            toast.success(lastGameId ? `Game #${lastGameId} saved!` : "Game saved!", {
+            toast.success(lastGameId ? `Match #${lastGameId} enregistre !` : "Match enregistre !", {
                 action: {
-                    label: "Undo",
+                    label: "Annuler",
                     onClick: () => void undoLastSubmission()
                 },
                 // keep the toast visible a bit longer for undo
@@ -208,7 +208,7 @@
             });
 
         } catch (err: any) {
-            toast.error(err?.message || "Failed to save game.");
+            toast.error(err?.message || "Impossible d'enregistrer le match.");
         } finally {
             submitting = false;
         }
@@ -221,11 +221,11 @@
             <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.15),transparent_45%)]"></div>
             <div class="relative flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <Card.Title class="text-3xl font-black tracking-tight">Create Match</Card.Title>
-                    <Card.Description>Drag players into red and blue teams, then submit the score.</Card.Description>
+                    <Card.Title class="text-3xl font-black tracking-tight">Creer un match</Card.Title>
+                    <Card.Description>Glissez les joueurs dans les equipes rouge et bleue, puis validez le score.</Card.Description>
                 </div>
                 <div class="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                    {columnItems[0].items.length} players available
+                    {columnItems[0].items.length} joueurs disponibles
                 </div>
             </div>
         </Card.Header>
@@ -256,12 +256,12 @@
                         <div class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
                             <button
                                     class="h-6 w-6 rounded-full bg-red-700 text-white text-[10px] font-semibold grid place-items-center shadow"
-                                    title="Send to Red"
+                                    title="Envoyer en rouge"
                                     onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
                             >R</button>
                             <button
                                     class="h-6 w-6 rounded-full bg-blue-700 text-white text-[10px] font-semibold grid place-items-center shadow"
-                                    title="Send to Blue"
+                                    title="Envoyer en bleu"
                                     onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
                             >B</button>
                         </div>
@@ -276,9 +276,9 @@
             <Card.Root class="rounded-3xl border border-red-500/25 bg-gradient-to-b from-red-950/20 to-background">
                 <Card.Header class="pb-2">
                     <div class="flex items-center justify-between">
-                        <Card.Title class="text-xl">Red Team</Card.Title>
+                        <Card.Title class="text-xl">Equipe rouge</Card.Title>
                         <span class="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 text-xs text-red-200">
-                            {column.items.length} players
+                            {column.items.length} joueurs
                         </span>
                     </div>
                 </Card.Header>
@@ -305,12 +305,12 @@
                                 <div class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
                                     <button
                                             class="h-6 w-6 rounded-full bg-blue-700 text-white text-[10px] font-semibold grid place-items-center shadow"
-                                            title="Move to Blue"
+                                            title="Deplacer en bleu"
                                             onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
                                     >B</button>
                                     <button
                                             class="h-6 w-6 rounded-full bg-neutral-700 text-white text-[10px] font-semibold grid place-items-center shadow"
-                                            title="Back to players"
+                                            title="Retour aux joueurs"
                                             onclick={withNoDrag(() => moveItemToColumn(item.id, COL_PLAYERS))}
                                     >X</button>
                                 </div>
@@ -321,27 +321,27 @@
             </Card.Root>
         {/each}
 
-        <Card.Root class="rounded-3xl border border-emerald-500/25 bg-gradient-to-b from-emerald-950/18 to-background">
-            <Card.Header>
-                <Card.Title class="text-xl">Submit Score</Card.Title>
-                <Card.Description>Enter the final score for both teams.</Card.Description>
-            </Card.Header>
-            <Card.Content>
-                <div class="grid grid-cols-[1fr_auto_1fr] items-end gap-4">
-                    <div class="space-y-2 text-center">
-                        <Label class="text-foreground/90" for="redScore">Red score</Label>
-                        <Input id="redScore" type="number" bind:value={redScore} class="h-12 text-center text-lg font-semibold" placeholder="0" max={10} min={0}/>
-                    </div>
+            <Card.Root class="rounded-3xl border border-emerald-500/25 bg-gradient-to-b from-emerald-950/18 to-background">
+                <Card.Header>
+                    <Card.Title class="text-xl">Valider le score</Card.Title>
+                    <Card.Description>Entrez le score final des deux equipes.</Card.Description>
+                </Card.Header>
+                <Card.Content>
+                    <div class="grid grid-cols-[1fr_auto_1fr] items-end gap-4">
+                        <div class="space-y-2 text-center">
+                            <Label class="text-foreground/90" for="redScore">Score rouge</Label>
+                            <Input id="redScore" type="number" bind:value={redScore} class="h-12 text-center text-lg font-semibold" placeholder="0" max={10} min={0}/>
+                        </div>
                     <div class="pb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">VS</div>
                     <div class="space-y-2 text-center">
-                        <Label class="text-foreground/90" for="blueScore">Blue score</Label>
+                        <Label class="text-foreground/90" for="blueScore">Score bleu</Label>
                         <Input id="blueScore" type="number" bind:value={blueScore} class="h-12 text-center text-lg font-semibold" placeholder="0" max={10} min={0}/>
                     </div>
                 </div>
             </Card.Content>
             <Card.Footer class="flex flex-col items-center gap-2 pt-0">
                 <Button class="h-11 min-w-[170px] rounded-xl bg-emerald-500 text-black font-semibold hover:bg-emerald-400" onclick={submitScore} disabled={submitting}>
-                    {submitting ? 'Submitting…' : 'Send Score'}
+                    {submitting ? 'Envoi...' : 'Envoyer le score'}
                 </Button>
             </Card.Footer>
         </Card.Root>
@@ -350,9 +350,9 @@
             <Card.Root class="rounded-3xl border border-blue-500/25 bg-gradient-to-b from-blue-950/20 to-background">
                 <Card.Header class="pb-2">
                     <div class="flex items-center justify-between">
-                        <Card.Title class="text-xl">Blue Team</Card.Title>
+                        <Card.Title class="text-xl">Equipe bleue</Card.Title>
                         <span class="rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-xs text-blue-200">
-                            {column.items.length} players
+                            {column.items.length} joueurs
                         </span>
                     </div>
                 </Card.Header>
@@ -379,12 +379,12 @@
                                 <div class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
                                     <button
                                             class="h-6 w-6 rounded-full bg-red-700 text-white text-[10px] font-semibold grid place-items-center shadow"
-                                            title="Move to Red"
+                                            title="Deplacer en rouge"
                                             onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
                                     >R</button>
                                     <button
                                             class="h-6 w-6 rounded-full bg-neutral-700 text-white text-[10px] font-semibold grid place-items-center shadow"
-                                            title="Back to players"
+                                            title="Retour aux joueurs"
                                             onclick={withNoDrag(() => moveItemToColumn(item.id, COL_PLAYERS))}
                                     >X</button>
                                 </div>

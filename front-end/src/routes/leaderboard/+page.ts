@@ -41,7 +41,7 @@ export const load: PageLoad = async ({fetch, url}) => {
             const muNum = Number(mu) || 0;
             const sigmaNum = Number(sigma) || 0;
             return {
-                name: p.player_name ?? p.name ?? 'Unknown',
+                name: p.player_name ?? p.name ?? 'Inconnu',
                 wins: p.wins,
                 losses: p.games_played - p.wins,
                 elo: Math.round(muNum)

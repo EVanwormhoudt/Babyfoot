@@ -15,14 +15,14 @@
     data.year ||= new Date().getFullYear();
 
     const scopeOptions = [
-        {value: "monthly", label: "Monthly"},
-        {value: "yearly", label: "Yearly"},
-        {value: "overall", label: "Overall"}
+        {value: "monthly", label: "Mensuel"},
+        {value: "yearly", label: "Annuel"},
+        {value: "overall", label: "Global"}
     ];
 
     const monthNames = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        "Janv", "Fev", "Mars", "Avr", "Mai", "Juin",
+        "Juil", "Aout", "Sept", "Oct", "Nov", "Dec"
     ];
     const months = monthNames.map((label, i) => ({
         value: String(i + 1),
@@ -47,13 +47,13 @@
 
     // --- LABELS FOR TRIGGERS ---
     const scopeLabel = $derived(
-        scopeOptions.find((o) => o.value === scopeSel)?.label ?? "Scope"
+        scopeOptions.find((o) => o.value === scopeSel)?.label ?? "Periode"
     );
     const yearLabel = $derived(
-        years.find((y) => y.value === yearSel)?.label ?? "Year"
+        years.find((y) => y.value === yearSel)?.label ?? "Annee"
     );
     const monthLabel = $derived(
-        months.find((m) => m.value === monthSel)?.label ?? "Month"
+        months.find((m) => m.value === monthSel)?.label ?? "Mois"
     );
 
     // --- URL SYNC EFFECT ---
@@ -185,10 +185,10 @@
     <Table.Root>
         <Table.Header>
             <Table.Row>
-                <Table.Head>Name</Table.Head>
-                <Table.Head>Wins</Table.Head>
-                <Table.Head>Losses</Table.Head>
-                <Table.Head>Winrate</Table.Head>
+                <Table.Head>Nom</Table.Head>
+                <Table.Head>Victoires</Table.Head>
+                <Table.Head>Defaites</Table.Head>
+                <Table.Head>Taux de victoire</Table.Head>
                 <Table.Head class="text-right">Elo</Table.Head>
             </Table.Row>
         </Table.Header>

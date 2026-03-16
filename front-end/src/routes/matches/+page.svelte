@@ -122,7 +122,7 @@
 
     // simple label for the trigger button
     function labelFromRange(r?: any) {
-        if (!r?.start || !r?.end) return "Pick a date range";
+        if (!r?.start || !r?.end) return "Choisir une plage de dates";
         return `${r.start.toString()} — ${r.end.toString()}`;
     }
 
@@ -131,7 +131,7 @@
 <!-- Filters -->
 <div class="mb-6 mt-3 rounded-2xl border border-border/60 bg-background/60 p-3">
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <p class="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Match Filters</p>
+        <p class="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Filtres matchs</p>
         <div class="flex flex-wrap items-center gap-2">
             <Popover.Root>
                 <Popover.Trigger>
@@ -145,9 +145,9 @@
                     <RangeCalendar bind:value={range} class="rounded-md border"/>
                 </Popover.Content>
             </Popover.Root>
-            <Button onclick={() => setMonth(0)} variant="secondary">This month</Button>
-            <Button onclick={() => setMonth(-1)} variant="ghost">Previous month</Button>
-            <Button onclick={clearDates} variant="destructive">Clear</Button>
+            <Button onclick={() => setMonth(0)} variant="secondary">Ce mois-ci</Button>
+            <Button onclick={() => setMonth(-1)} variant="ghost">Mois precedent</Button>
+            <Button onclick={clearDates} variant="destructive">Effacer</Button>
         </div>
     </div>
 </div>
@@ -176,16 +176,16 @@
 
                 <Card.Header class="relative flex flex-row items-center justify-between gap-3 pb-1">
                     <Badge variant="secondary" class="text-xs">{toLocal(game.game_timestamp)}</Badge>
-                    <span class="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Match #{game.id}</span>
+                    <span class="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Match n°{game.id}</span>
                 </Card.Header>
 
                 <Card.Content class="relative pt-3">
                     <div class="grid grid-cols-1 items-stretch gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
                         <div class="rounded-2xl border px-3 py-3 {teamPanelClass(t1Wins)}">
                             <div class="mb-2 flex items-center justify-between">
-                                <span class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Team 1</span>
+                                <span class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Equipe 1</span>
                                 {#if t1Wins}
-                                    <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">Winner</span>
+                                    <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">Vainqueur</span>
                                 {/if}
                             </div>
                             <div class="flex flex-wrap gap-2 md:justify-end">
@@ -212,7 +212,7 @@
                         </div>
 
                         <div class="rounded-2xl border border-border/60 bg-background/80 px-5 py-4 text-center shadow-inner">
-                            <div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Final score</div>
+                            <div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Score final</div>
                             <div class="mt-1 flex items-baseline justify-center gap-2">
                                 <span class="text-4xl font-black leading-none {t1Wins ? 'text-emerald-400' : 'text-foreground/90'}">{s1}</span>
                                 <span class="text-muted-foreground">–</span>
@@ -222,9 +222,9 @@
 
                         <div class="rounded-2xl border px-3 py-3 {teamPanelClass(t2Wins)}">
                             <div class="mb-2 flex items-center justify-between">
-                                <span class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Team 2</span>
+                                <span class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Equipe 2</span>
                                 {#if t2Wins}
-                                    <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">Winner</span>
+                                    <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">Vainqueur</span>
                                 {/if}
                             </div>
                             <div class="flex flex-wrap gap-2">
@@ -267,11 +267,11 @@
                 <Pagination.Item>
                     <a
                             href={"?"+buildQuery({ page: Math.max(1, data.page - 1) })}
-                            aria-label="Previous page"
+                            aria-label="Page precedente"
                             class="px-3 py-2 rounded-md hover:bg-muted"
                             aria-disabled={data.page === 1}
                     >
-                        Previous
+                        Precedent
                     </a>
                 </Pagination.Item>
 
@@ -294,11 +294,11 @@
                 <Pagination.Item>
                     <a
                             href={"?"+buildQuery({ page: Math.min(data.pageCount, data.page + 1) })}
-                            aria-label="Next page"
+                            aria-label="Page suivante"
                             class="px-3 py-2 rounded-md hover:bg-muted"
                             aria-disabled={data.page === data.pageCount}
                     >
-                        Next
+                        Suivant
                     </a>
                 </Pagination.Item>
             </Pagination.Content>

@@ -53,18 +53,18 @@
     let hoveredPointIndex = $state<number | null>(null);
 
     const monthOptions = [
-        {value: 1, label: 'January'},
-        {value: 2, label: 'February'},
-        {value: 3, label: 'March'},
-        {value: 4, label: 'April'},
-        {value: 5, label: 'May'},
-        {value: 6, label: 'June'},
-        {value: 7, label: 'July'},
-        {value: 8, label: 'August'},
-        {value: 9, label: 'September'},
-        {value: 10, label: 'October'},
-        {value: 11, label: 'November'},
-        {value: 12, label: 'December'}
+        {value: 1, label: 'Janvier'},
+        {value: 2, label: 'Fevrier'},
+        {value: 3, label: 'Mars'},
+        {value: 4, label: 'Avril'},
+        {value: 5, label: 'Mai'},
+        {value: 6, label: 'Juin'},
+        {value: 7, label: 'Juillet'},
+        {value: 8, label: 'Aout'},
+        {value: 9, label: 'Septembre'},
+        {value: 10, label: 'Octobre'},
+        {value: 11, label: 'Novembre'},
+        {value: 12, label: 'Decembre'}
     ];
 
     const selectedPlayer = $derived(
@@ -72,17 +72,17 @@
     );
 
     const selectedPlayerName = $derived(
-        selectedPlayer?.player_name ?? 'Player'
+        selectedPlayer?.player_name ?? 'Joueur'
     );
     const selectedScopeLabel = $derived.by(() => {
         if (selectedScope === 'monthly') {
             const month = monthOptions.find((item) => String(item.value) === selectedMonth);
-            return `${month?.label ?? 'Month'} ${selectedYear}`;
+            return `${month?.label ?? 'Mois'} ${selectedYear}`;
         }
         if (selectedScope === 'yearly') {
             return selectedYear;
         }
-        return 'Overall';
+        return 'Global';
     });
 
     function applyFilters() {
@@ -104,12 +104,18 @@
     }
 
     function muAmount(value: number) {
-        return `elo ${value.toFixed(1)}`;
+        return `Elo ${value.toFixed(1)}`;
     }
 
     function signed(value: number) {
         const sign = value > 0 ? '+' : '';
         return `${sign}${value.toFixed(1)}`;
+    }
+
+    function scopeToLabel(scope: Scope): string {
+        if (scope === 'monthly') return 'Mensuel';
+        if (scope === 'yearly') return 'Annuel';
+        return 'Global';
     }
 
     function formatDate(value: string): string {
@@ -287,18 +293,18 @@
 </script>
 
 <section class="p-8 space-y-6">
-    <h2 class="text-3xl font-semibold">Stats</h2>
+    <h2 class="text-3xl font-semibold">Statistiques</h2>
 
     {#if data.players.length === 0}
         <Card>
-            <CardContent class="py-8 text-center text-muted-foreground">
-                No players found.
-            </CardContent>
+                <CardContent class="py-8 text-center text-muted-foreground">
+                Aucun joueur trouve.
+                </CardContent>
         </Card>
     {:else}
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
             <label class="flex flex-col gap-2">
-                <span class="text-sm text-muted-foreground">Who are you?</span>
+                <span class="text-sm text-muted-foreground">Joueur</span>
                 <select
                         bind:value={selectedPlayerId}
                         class="h-10 rounded-md border bg-background px-3 text-sm"
@@ -311,21 +317,21 @@
             </label>
 
             <label class="flex flex-col gap-2">
-                <span class="text-sm text-muted-foreground">Scope</span>
+                <span class="text-sm text-muted-foreground">Periode</span>
                 <select
                         bind:value={selectedScope}
                         class="h-10 rounded-md border bg-background px-3 text-sm"
                         onchange={applyFilters}
                 >
-                    <option value="overall">Overall</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
+                    <option value="overall">Global</option>
+                    <option value="monthly">Mensuel</option>
+                    <option value="yearly">Annuel</option>
                 </select>
             </label>
 
             {#if selectedScope === 'monthly' || selectedScope === 'yearly'}
                 <label class="flex flex-col gap-2">
-                    <span class="text-sm text-muted-foreground">Year</span>
+                    <span class="text-sm text-muted-foreground">Annee</span>
                     <select
                             bind:value={selectedYear}
                             class="h-10 rounded-md border bg-background px-3 text-sm"
@@ -340,7 +346,7 @@
 
             {#if selectedScope === 'monthly'}
                 <label class="flex flex-col gap-2">
-                    <span class="text-sm text-muted-foreground">Month</span>
+                    <span class="text-sm text-muted-foreground">Mois</span>
                     <select
                             bind:value={selectedMonth}
                             class="h-10 rounded-md border bg-background px-3 text-sm"
@@ -367,35 +373,35 @@
                 </CardHeader>
                 <CardContent class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                     <div class="rounded-md border p-3">
-                        <div class="text-muted-foreground">Games played</div>
+                        <div class="text-muted-foreground">Matchs joues</div>
                         <div class="text-2xl font-semibold">{data.stats.games_played}</div>
                     </div>
                     <div class="rounded-md border p-3">
-                        <div class="text-muted-foreground">Wins</div>
+                        <div class="text-muted-foreground">Victoires</div>
                         <div class="text-2xl font-semibold">{data.stats.wins}</div>
                     </div>
                     <div class="rounded-md border p-3">
-                        <div class="text-muted-foreground">Win rate</div>
+                        <div class="text-muted-foreground">Taux de victoire</div>
                         <div class="text-2xl font-semibold">{percent(data.stats.win_rate)}</div>
                     </div>
                     <div class="rounded-md border p-3">
-                        <div class="text-muted-foreground">Avg team score</div>
+                        <div class="text-muted-foreground">Score moyen equipe</div>
                         <div class="text-2xl font-semibold">{data.stats.average_team_score.toFixed(2)}</div>
                     </div>
                     <div class="rounded-md border p-3">
-                        <div class="text-muted-foreground">Avg opponent score</div>
+                        <div class="text-muted-foreground">Score moyen adversaires</div>
                         <div class="text-2xl font-semibold">{data.stats.average_opponent_score.toFixed(2)}</div>
                     </div>
                     <div class="rounded-md border p-3">
-                        <div class="text-muted-foreground">Current streak</div>
+                        <div class="text-muted-foreground">Serie actuelle</div>
                         <div class="text-2xl font-semibold">{data.stats.current_win_streak}</div>
                     </div>
                     <div class="rounded-md border p-3">
-                        <div class="text-muted-foreground">Longest streak</div>
+                        <div class="text-muted-foreground">Plus longue serie</div>
                         <div class="text-2xl font-semibold">{data.stats.longest_win_streak}</div>
                     </div>
                     <div class="rounded-md border p-3">
-                        <div class="text-muted-foreground">Best teammate</div>
+                        <div class="text-muted-foreground">Meilleur coequipier</div>
                         <div class="text-base font-medium">
                             {data.stats.best_teammate
                                 ? `${data.stats.best_teammate.player_name} (${percent(data.stats.best_teammate.win_rate)})`
@@ -403,7 +409,7 @@
                         </div>
                     </div>
                     <div class="rounded-md border p-3">
-                        <div class="text-muted-foreground">Worst teammate</div>
+                        <div class="text-muted-foreground">Pire coequipier</div>
                         <div class="text-base font-medium">
                             {data.stats.worst_teammate
                                 ? `${data.stats.worst_teammate.player_name} (${percent(data.stats.worst_teammate.win_rate)})`
@@ -423,18 +429,18 @@
         {:else if chart.points.length === 0}
             <Card>
                 <CardHeader>
-                    <CardTitle>Rating history ({selectedScope})</CardTitle>
+                    <CardTitle>Historique Elo ({selectedScopeLabel})</CardTitle>
                 </CardHeader>
                 <CardContent class="py-6 text-sm text-muted-foreground">
-                    No rating history points found for this scope.
+                    Aucun point d'historique Elo pour cette periode.
                 </CardContent>
             </Card>
         {:else}
             <Card class="border-emerald-500/20 bg-gradient-to-b from-emerald-950/20 to-background">
                 <CardHeader class="flex flex-row items-start justify-between gap-4">
                     <div class="space-y-1">
-                        <CardTitle>{selectedPlayerName} rating history ({selectedScopeLabel})</CardTitle>
-                        <p class="text-xs text-muted-foreground">Evolution of Elo across recorded snapshots</p>
+                        <CardTitle>Historique Elo de {selectedPlayerName} ({selectedScopeLabel})</CardTitle>
+                        <p class="text-xs text-muted-foreground">Evolution de l'Elo sur les snapshots enregistres</p>
                     </div>
                     <div class="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
                         {pointCount} points
@@ -446,7 +452,7 @@
                             viewBox={`0 0 ${chart.width} ${chart.height}`}
                             preserveAspectRatio="xMinYMin meet"
                             role="img"
-                            aria-label={`${selectedPlayerName} rating history graph`}
+                            aria-label={`Graphique d'historique Elo de ${selectedPlayerName}`}
                             onpointerleave={() => (hoveredPointIndex = null)}
                     >
                         <defs>
@@ -555,40 +561,40 @@
                                     {hoveredPoint.dateLabel}
                                 </text>
                                 <text x="12" y="38" fill="#d1fae5" class="text-[11px]">
-                                    Amount: {muAmount(hoveredPoint.mu)}
+                                    Valeur : {muAmount(hoveredPoint.mu)}
                                 </text>
                                 <text x="12" y="54" fill="#d1fae5" class="text-[11px]">
-                                    Rank: {hoveredPoint.rank} ({hoveredPoint.rankType})
+                                    Rang : {hoveredPoint.rank} ({scopeToLabel(hoveredPoint.rankType)})
                                 </text>
                                 <text x="12" y="70" fill="#d1fae5" class="text-[11px]">
                                     Sigma: {hoveredPoint.sigma === null ? '—' : hoveredPoint.sigma.toFixed(1)}
                                 </text>
                                 <text x="12" y="86" fill="#d1fae5" class="text-[11px]">
-                                    Δ prev: {hoveredDelta === null ? '—' : signed(hoveredDelta)}
+                                    Δ precedent : {hoveredDelta === null ? '—' : signed(hoveredDelta)}
                                 </text>
                             </g>
                         {/if}
                     </svg>
                     <div class="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{chart.startDate}</span>
-                        <span class="rounded-full border border-border/60 px-2 py-0.5">Range</span>
+                        <span class="rounded-full border border-border/60 px-2 py-0.5">Periode</span>
                         <span>{chart.endDate}</span>
                     </div>
                     <div class="grid grid-cols-2 gap-2 text-xs lg:grid-cols-4">
                         <div class="rounded-lg border border-border/60 bg-background/70 p-2">
-                            <div class="text-muted-foreground">Min amount</div>
+                            <div class="text-muted-foreground">Elo minimum</div>
                             <div class="mt-1 font-semibold">{muAmount(chart.minMu)}</div>
                         </div>
                         <div class="rounded-lg border border-border/60 bg-background/70 p-2">
-                            <div class="text-muted-foreground">Max amount</div>
+                            <div class="text-muted-foreground">Elo maximum</div>
                             <div class="mt-1 font-semibold">{muAmount(chart.maxMu)}</div>
                         </div>
                         <div class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2">
-                            <div class="text-emerald-200/80">Current</div>
+                            <div class="text-emerald-200/80">Actuel</div>
                             <div class="mt-1 font-semibold text-emerald-300">{muAmount(chart.latestMu)}</div>
                         </div>
                         <div class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2">
-                            <div class="text-emerald-200/80">Trend</div>
+                            <div class="text-emerald-200/80">Tendance</div>
                             <div class="mt-1 font-semibold {trendDelta >= 0 ? 'text-emerald-300' : 'text-rose-300'}">
                                 {signed(trendDelta)}
                             </div>

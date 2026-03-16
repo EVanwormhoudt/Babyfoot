@@ -32,7 +32,7 @@
         new Date(iso).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
 
     // ——— Helpers for leaderboard ———
-    const rowName = (r: LeaderboardRow) => r?.player_name ?? 'Player';
+    const rowName = (r: LeaderboardRow) => r?.player_name ?? 'Joueur';
 
     const rowRating = (r: LeaderboardRow) => r?.mu ?? r?.rating?.mu_monthly;
     const rowWL = (r: LeaderboardRow) => `${r.wins ?? 0}-${Math.max(0, (r.games_played ?? 0) - (r.wins ?? 0))}`;
@@ -55,10 +55,10 @@
         <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_45%)]"></div>
         <div class="relative space-y-6 p-7 md:p-10">
             <div class="space-y-3">
-                <p class="text-xs uppercase tracking-[0.2em] text-emerald-300/80">BabyFoot Dashboard</p>
+                <p class="text-xs uppercase tracking-[0.2em] text-emerald-300/80">Tableau de bord BabyFoot</p>
                 <h1 class="text-4xl font-black tracking-tight sm:text-5xl">BabyFoot MyDSO</h1>
                 <p class="max-w-2xl text-muted-foreground">
-                    Track matches, follow leaderboard momentum, and analyze player performance.
+                    Suivez les matchs, l'evolution du classement et les performances des joueurs.
                 </p>
             </div>
             <div class="flex flex-wrap gap-3">
@@ -71,10 +71,10 @@
             </div>
             <div class="flex flex-wrap gap-2 text-xs">
                 <span class="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-muted-foreground">
-                    {data?.games?.length ?? 0} recent matches
+                    {data?.games?.length ?? 0} matchs recents
                 </span>
                 <span class="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-muted-foreground">
-                    {data?.top3?.length ?? 0} top players this month
+                    {data?.top3?.length ?? 0} meilleurs joueurs ce mois-ci
                 </span>
             </div>
         </div>
@@ -96,7 +96,7 @@
                                 <a
                                         class="group block rounded-2xl border border-border/60 bg-background/65 p-3 transition hover:border-emerald-500/35 hover:bg-emerald-500/10"
                                         href={`/matches/${g.id}`}
-                                        aria-label="Open match details"
+                                        aria-label="Ouvrir les details du match"
                                 >
                                     <div class="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                                         <span>{dateDMY(g.game_timestamp)}</span>
@@ -111,11 +111,11 @@
                                                 {/each}
                                                 {#if teamPlayers(g, 1).length > 2}
                                                     <p class="truncate text-[11px] text-muted-foreground">
-                                                        +{teamPlayers(g, 1).length - 2} more
+                                                        +{teamPlayers(g, 1).length - 2} de plus
                                                     </p>
                                                 {/if}
                                             {:else}
-                                                <p class="truncate text-sm text-muted-foreground">Team 1</p>
+                                                <p class="truncate text-sm text-muted-foreground">Equipe 1</p>
                                             {/if}
                                         </div>
 
@@ -135,11 +135,11 @@
                                                 {/each}
                                                 {#if teamPlayers(g, 2).length > 2}
                                                     <p class="truncate text-[11px] text-muted-foreground">
-                                                        +{teamPlayers(g, 2).length - 2} more
+                                                        +{teamPlayers(g, 2).length - 2} de plus
                                                     </p>
                                                 {/if}
                                             {:else}
-                                                <p class="truncate text-sm text-muted-foreground">Team 2</p>
+                                                <p class="truncate text-sm text-muted-foreground">Equipe 2</p>
                                             {/if}
                                         </div>
                                     </div>
@@ -149,7 +149,7 @@
                     </ul>
                 {:else}
                     <div class="rounded-2xl border border-dashed border-border/60 bg-background/40 py-10 text-center text-sm text-muted-foreground">
-                        No matches yet. Be the first to create one.
+                        Aucun match pour l'instant. Creez-en un.
                     </div>
                 {/if}
             </CardContent>
@@ -157,7 +157,7 @@
 
         <Card class="rounded-3xl border border-blue-500/20 bg-gradient-to-b from-blue-950/18 to-background shadow-[0_12px_30px_rgba(0,0,0,0.2)]">
             <CardHeader class="pb-2">
-                <CardTitle class="text-xl font-semibold tracking-tight">Top Players (du mois)</CardTitle>
+                <CardTitle class="text-xl font-semibold tracking-tight">Meilleurs joueurs (du mois)</CardTitle>
             </CardHeader>
             <CardContent>
                 {#if data?.top3?.length}
@@ -171,12 +171,12 @@
                                         </div>
                                         <div class="min-w-0">
                                             <p class="truncate font-medium">{rowName(row)}</p>
-                                            <p class="text-xs text-muted-foreground">W-L: {rowWL(row)}</p>
+                                            <p class="text-xs text-muted-foreground">V-D : {rowWL(row)}</p>
                                         </div>
                                     </div>
                                     <div class="text-right">
                                         <p class="font-semibold tabular-nums">{ratingLabel(row)}</p>
-                                        <p class="text-xs text-muted-foreground">Rating</p>
+                                        <p class="text-xs text-muted-foreground">Elo</p>
                                     </div>
                                 </a>
                             </li>
