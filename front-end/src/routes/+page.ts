@@ -27,21 +27,50 @@ export type LeaderboardRow = {
     rating?: LeaderboardRating | null;
 };
 
+function isTenZero(game: GameRead): boolean {
+    return (
+        (Number(game.result_team1) === 10 && Number(game.result_team2) === 0) ||
+        (Number(game.result_team1) === 0 && Number(game.result_team2) === 10)
+    );
+}
+
 export const load: PageLoad = async ({fetch}) => {
-    const {items, total: _total} = await getGames({
+    const pageSize = 200;
+    const {items, total} = await getGames({
         scope: 'all',
-        limit: 5,
+        limit: pageSize,
         offset: 0
     }, fetch);
 
-    let games = items ?? [];
-    games = games.sort((a, b) => new Date(b.game_timestamp).getTime() - new Date(a.game_timestamp).getTime());
+    const firstBatch = (items ?? []).sort(
+        (a, b) => new Date(b.game_timestamp).getTime() - new Date(a.game_timestamp).getTime()
+    );
+    const games = firstBatch.slice(0, 5);
+    let lastTenZeroMatch: GameRead | null = firstBatch.find(isTenZero) ?? null;
+
+    if (!lastTenZeroMatch) {
+        for (let offset = pageSize; offset < total; offset += pageSize) {
+            const {items: nextItems} = await getGames(
+                {scope: 'all', limit: pageSize, offset},
+                fetch
+            );
+            const nextBatch = (nextItems ?? []).sort(
+                (a, b) => new Date(b.game_timestamp).getTime() - new Date(a.game_timestamp).getTime()
+            );
+            const match = nextBatch.find(isTenZero);
+            if (match) {
+                lastTenZeroMatch = match;
+                break;
+            }
+        }
+    }
 
     const lb = await getLeaderboard('monthly', {}, fetch);
     const top3: LeaderboardRow[] = Array.isArray(lb) ? lb.slice(0, 3) : [];
 
     return {
         games,
+        lastTenZeroMatch,
         top3: top3.filter((p) => (p?.wins ?? 0) > 0)
     };
 };

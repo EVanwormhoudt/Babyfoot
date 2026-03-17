@@ -7,6 +7,7 @@
 
     export let data: {
         games: GameRead[];
+        lastTenZeroMatch: GameRead | null;
         top3: LeaderboardRow[];
     };
 
@@ -20,6 +21,10 @@
         ) ?? [];
 
     const nameOf = (p?: Player) => p?.player_name ?? '—';
+    const teamLabel = (g: GameRead, n: 1 | 2) => {
+        const names = teamPlayers(g, n).map((p) => nameOf(p)).filter((name) => name !== '—');
+        return names.length > 0 ? names.join(' / ') : `Equipe ${n}`;
+    };
 
     const scoreA = (g: GameRead) => g.result_team1 ?? 0;
     const scoreB = (g: GameRead) => g.result_team2 ?? 0;
@@ -77,6 +82,26 @@
                     {data?.top3?.length ?? 0} meilleurs joueurs ce mois-ci
                 </span>
             </div>
+            {#if data.lastTenZeroMatch}
+                <a
+                        href={`/matches/${data.lastTenZeroMatch.id}`}
+                        class="inline-flex max-w-full items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100 transition hover:bg-emerald-500/20"
+                        aria-label="Voir la dernière Fanny"
+                >
+                    <span class="font-semibold uppercase tracking-[0.12em] text-emerald-300">Derniere Fanny</span>
+                    <span class="truncate">
+                        {dateDMY(data.lastTenZeroMatch.game_timestamp)}
+                        :
+                        {teamLabel(data.lastTenZeroMatch, 1)}
+                        {data.lastTenZeroMatch.result_team1}-{data.lastTenZeroMatch.result_team2}
+                        {teamLabel(data.lastTenZeroMatch, 2)}
+                    </span>
+                </a>
+            {:else}
+                <span class="inline-flex items-center rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-xs text-muted-foreground">
+                    Aucun match 10-0 enregistre pour le moment.
+                </span>
+            {/if}
         </div>
     </section>
 
