@@ -3,7 +3,6 @@ services:
     image: postgres:16-alpine
     container_name: foosball-postgres
     environment:
-      POSTGRES_DB: babyfoot
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       TZ: Europe/Paris
@@ -11,8 +10,10 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./babyfoot-dump.sql:/seed/babyfoot-dump.sql:ro
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d babyfoot" ]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
