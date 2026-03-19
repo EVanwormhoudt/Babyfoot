@@ -1,4 +1,5 @@
 <script lang="ts">
+    import {flip} from 'svelte/animate';
     import {dndzone} from 'svelte-dnd-action';
     import {Input} from '$lib/components/ui/input';
     import {Button} from '$lib/components/ui/button';
@@ -40,14 +41,22 @@
     const rows = $derived(Math.max(1, Math.ceil(totalItems / 5)));
     const height = $derived(`${rows * 55}px`);
 
-    const flipDurationMs = 300;
-    const dropTargetStyle = { outline: 'rgba(255, 255, 255, 0.5) solid 2px' };
+    const flipDurationMs = 180;
+    const dropTargetStyle = {};
     const dropTargetStyleMain = {};
+    const dropTargetClassesMain = ['ring-2', 'ring-emerald-400/70', 'bg-emerald-500/10'];
+    const dropTargetClassesRed = ['ring-2', 'ring-red-400/70', 'bg-red-500/10'];
+    const dropTargetClassesBlue = ['ring-2', 'ring-blue-400/70', 'bg-blue-500/10'];
 
     function transformDraggedElement(el?: HTMLElement) {
         if (!el) return;
-        el.style.backgroundColor = '#e5e7eb';
-        el.style.color = '#000';
+        el.style.background = 'hsl(var(--background))';
+        el.style.color = 'hsl(var(--foreground))';
+        el.style.border = '1px solid rgba(16,185,129,0.55)';
+        el.style.borderRadius = '0.75rem';
+        el.style.boxShadow = '0 14px 34px rgba(0, 0, 0, 0.28)';
+        el.style.cursor = 'grabbing';
+        el.style.transform = 'scale(1.02)';
     }
 
     function handleDndConsiderCards(cid: number, e: CustomEvent<{ items: DndItem[] }>) {
@@ -223,6 +232,7 @@
                 <div>
                     <Card.Title class="text-3xl font-black tracking-tight">Creer un match</Card.Title>
                     <Card.Description>Glissez les joueurs dans les equipes rouge et bleue, puis validez le score.</Card.Description>
+                    <p class="mt-1 text-xs text-muted-foreground">Astuce : vous pouvez aussi reordonner les joueurs a l'interieur d'une equipe.</p>
                 </div>
                 <div class="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
                     {columnItems[0].items.length} joueurs disponibles
@@ -231,25 +241,30 @@
         </Card.Header>
         <Card.Content class="pt-2">
             <section
-                    class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+                    class="grid grid-cols-2 justify-items-center gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
                     use:dndzone={{
 				items: columnItems[0].items,
 				type: 'player',
-				flipDurationMs,
-				dropTargetStyle: dropTargetStyleMain,
-				transformDraggedElement
-			}}
+					flipDurationMs,
+					dropTargetStyle: dropTargetStyleMain,
+					dropTargetClasses: dropTargetClassesMain,
+					centreDraggedOnCursor: true,
+					transformDraggedElement
+				}}
                     onconsider={(e) => handleDndConsiderCards(columnItems[0].id, e)}
                     onfinalize={(e) => handleDndFinalizeCards(columnItems[0].id, e)}
                     style="height: {height};"
             >
                 {#each columnItems[0].items as item (item.id)}
                     <div
-                            class="relative group h-12 rounded-xl border border-border/70 bg-background/80 px-3 text-sm text-foreground/90 shadow-sm transition hover:border-emerald-500/50 hover:bg-emerald-500/10"
+                            animate:flip={{duration: flipDurationMs}}
+                            class="relative group h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl border border-emerald-500/30 bg-card/95 px-3 text-[15px] font-semibold text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.2)] transition hover:border-emerald-400/70 hover:bg-emerald-500/12 active:cursor-grabbing"
                             title={item.name}
                     >
                         <div class="flex h-full items-center justify-between gap-2">
-                            <span class="truncate">{item.name}</span>
+                            <div class="flex min-w-0 items-center gap-2">
+                                <span class="truncate">{item.name}</span>
+                            </div>
                             <span class="text-muted-foreground">⠿</span>
                         </div>
 
@@ -284,21 +299,28 @@
                 </Card.Header>
                 <Card.Content>
                     <div
-                            class="grid min-h-[220px] max-h-[440px] gap-2 overflow-y-auto rounded-xl border border-border/60 bg-background/60 p-2"
+                            class="grid content-start justify-items-center min-h-[220px] max-h-[440px] gap-2 overflow-y-auto rounded-xl border border-border/60 bg-background/60 p-2"
                             use:dndzone={{
-						items: column.items,
-						type: 'player',
-						flipDurationMs,
-						dropTargetStyle,
-						transformDraggedElement
-					}}
+							items: column.items,
+							type: 'player',
+							flipDurationMs,
+							dropTargetStyle,
+							dropTargetClasses: dropTargetClassesRed,
+							centreDraggedOnCursor: true,
+							transformDraggedElement
+						}}
                             onconsider={(e) => handleDndConsiderCards(column.id, e)}
                             onfinalize={(e) => handleDndFinalizeCards(column.id, e)}
                     >
                         {#each column.items as item (item.id)}
-                            <div class="relative group h-12 rounded-xl border border-border/70 bg-background/85 px-3 text-sm text-foreground/90 transition hover:border-blue-500/40 hover:bg-blue-500/10">
+                            <div
+                                    animate:flip={{duration: flipDurationMs}}
+                                    class="relative group h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl border border-red-500/30 bg-card/95 px-3 text-[15px] font-semibold text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.2)] transition hover:border-blue-500/55 hover:bg-blue-500/12 active:cursor-grabbing"
+                            >
                                 <div class="flex h-full items-center justify-between gap-2">
-                                    <span class="truncate">{item.name}</span>
+                                    <div class="flex min-w-0 items-center gap-2">
+                                        <span class="truncate">{item.name}</span>
+                                    </div>
                                     <span class="text-muted-foreground">⠿</span>
                                 </div>
 
@@ -358,21 +380,28 @@
                 </Card.Header>
                 <Card.Content>
                     <div
-                            class="grid min-h-[220px] max-h-[440px] gap-2 overflow-y-auto rounded-xl border border-border/60 bg-background/60 p-2"
+                            class="grid content-start justify-items-center min-h-[220px] max-h-[440px] gap-2 overflow-y-auto rounded-xl border border-border/60 bg-background/60 p-2"
                             use:dndzone={{
-						items: column.items,
-						type: 'player',
-						flipDurationMs,
-						dropTargetStyle,
-						transformDraggedElement
-					}}
+							items: column.items,
+							type: 'player',
+							flipDurationMs,
+							dropTargetStyle,
+							dropTargetClasses: dropTargetClassesBlue,
+							centreDraggedOnCursor: true,
+							transformDraggedElement
+						}}
                             onconsider={(e) => handleDndConsiderCards(column.id, e)}
                             onfinalize={(e) => handleDndFinalizeCards(column.id, e)}
                     >
                         {#each column.items as item (item.id)}
-                            <div class="relative group h-12 rounded-xl border border-border/70 bg-background/85 px-3 text-sm text-foreground/90 transition hover:border-red-500/40 hover:bg-red-500/10">
+                            <div
+                                    animate:flip={{duration: flipDurationMs}}
+                                    class="relative group h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl border border-blue-500/30 bg-card/95 px-3 text-[15px] font-semibold text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.2)] transition hover:border-red-500/55 hover:bg-red-500/12 active:cursor-grabbing"
+                            >
                                 <div class="flex h-full items-center justify-between gap-2">
-                                    <span class="truncate">{item.name}</span>
+                                    <div class="flex min-w-0 items-center gap-2">
+                                        <span class="truncate">{item.name}</span>
+                                    </div>
                                     <span class="text-muted-foreground">⠿</span>
                                 </div>
 
