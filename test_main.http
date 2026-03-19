@@ -90,6 +90,14 @@ GET http://127.0.0.1:8000/api/players/1/history
 Accept: application/json
 
 ###
+GET http://127.0.0.1:8000/api/players/1/rating-history
+Accept: application/json
+
+###
+GET http://127.0.0.1:8000/api/players/1/rating-history?rating_type=monthly
+Accept: application/json
+
+###
 
 GET http://127.0.0.1:8000/api/players/leaderboard/
 Accept: application/json
@@ -102,6 +110,16 @@ Accept: application/json
 ###
 # 📊 Player Stats (Yearly Scope)
 GET http://127.0.0.1:8000/api/players/1/stats?scope=yearly
+Accept: application/json
+
+###
+# 📊 Player Stats (Yearly Scope for specific year)
+GET http://127.0.0.1:8000/api/players/1/stats?scope=yearly&year=2025
+Accept: application/json
+
+###
+# 📊 Player Stats (Monthly Scope for specific year+month)
+GET http://127.0.0.1:8000/api/players/1/stats?scope=monthly&year=2025&month=8
 Accept: application/json
 
 ###
