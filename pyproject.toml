@@ -1,0 +1,26 @@
+[project]
+name = "foosball-ratings"
+version = "0.1.0"
+description = "Foosball rating tracker backend (FastAPI + SQLModel)"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "apscheduler>=3.11,<4",
+    "beautifulsoup4>=4.13,<5",
+    "fastapi>=0.115,<1",
+    "numpy>=2.2,<3",
+    "openskill>=6.1,<7",
+    "psycopg2>=2.9,<3",
+    "pydantic>=2.10,<3",
+    "requests>=2.32,<3",
+    "sqlalchemy>=2.0.36,<3",
+    "sqlmodel>=0.0.22,<0.1",
+    "uvicorn>=0.32,<1",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28,<1",
+]
+
+[tool.uv]
+package = false
