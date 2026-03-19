@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: foosball-postgres
+    environment:
+      POSTGRES_DB: babyfoot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      TZ: Europe/Paris
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d babyfoot" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-net
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: foosball-fastapi
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/babyfoot
+      TIMEZONE: Europe/Paris
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8000"
+    restart: unless-stopped
+    networks:
+      - app-net
+
+  frontend:
+    build:
+      context: ./front-end
+      dockerfile: Dockerfile
+    container_name: foosball-frontend
+    environment:
+      PUBLIC_API_BASE: ""
+    depends_on:
+      - fastapi
+    expose:
+      - "5173"
+    restart: unless-stopped
+    networks:
+      - app-net
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: foosball-nginx
+    depends_on:
+      - fastapi
+      - frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+    networks:
+      - app-net
+
+volumes:
+  postgres_data:
+
+networks:
+  app-net:
+    driver: bridge

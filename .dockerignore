@@ -1,0 +1,14 @@
+.git
+.idea
+.venv
+.uv-cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+app.db
+front-end/node_modules
+front-end/.svelte-kit
+front-end/build
+front-end/dist
