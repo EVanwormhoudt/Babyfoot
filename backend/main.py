@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 from .api import router as api_router
+from .database_setup.seed_if_empty import populate_if_empty
 from .db.session import init_db
 from .jobs import snapshot_and_reset_monthly, snapshot_and_reset_yearly
 from .settings import settings
@@ -19,6 +20,7 @@ scheduler = BackgroundScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    populate_if_empty()
     scheduler.add_job(snapshot_and_reset_monthly, CronTrigger(day="1", hour=0, minute=0))
     scheduler.add_job(snapshot_and_reset_yearly, CronTrigger(month="1", day="1", hour=0, minute=0))
     scheduler.start()
