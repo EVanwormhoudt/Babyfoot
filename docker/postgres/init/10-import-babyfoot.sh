@@ -1,9 +1,10 @@
 #!/usr/bin/env sh
 set -eu
 
-if [ ! -f /seed/babyfoot.sql ]; then
-  echo "No dump file found at /seed/babyfoot.sql; skipping seed import."
-  exit 0
+if [ ! -s /seed/babyfoot.sql ]; then
+  echo "ERROR: expected /seed/babyfoot.sql to exist and be non-empty, but it was not found."
+  echo "       In Portainer, make sure the stack deploy includes babyfoot.sql at the compose path."
+  exit 1
 fi
 
 echo "Importing /seed/babyfoot.sql into ${POSTGRES_DB}..."
