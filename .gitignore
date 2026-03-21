@@ -163,6 +163,3 @@ cython_debug/
 .DS_Store
 .secret
 app.db
-
-
-/front-end/src/lib/components/ui/
