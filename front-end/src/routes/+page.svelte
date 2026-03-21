@@ -1,7 +1,6 @@
 <script lang="ts">
     import {Button} from '$lib/components/ui/button';
     import {Card, CardContent, CardHeader, CardTitle} from '$lib/components/ui/card';
-    import {Separator} from '$lib/components/ui/separator';
     import type {GameRead} from "$lib/api/types";
     import type {LeaderboardRow, Player} from "./+page";
 
@@ -208,7 +207,7 @@
                         {/each}
                     </ol>
 
-                    <Separator class="my-4"/>
+                    <div class="my-4 h-px w-full bg-border" role="separator" aria-orientation="horizontal"></div>
                     <div class="flex justify-end">
                         <Button class="rounded-lg" href="/leaderboard" size="sm" variant="outline">Classement entier</Button>
                     </div>
