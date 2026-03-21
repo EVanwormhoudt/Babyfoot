@@ -25364,8 +25364,7 @@ COPY public.players_rating_history (update_id, player_id, mu, sigma, date, rank,
 --
 
 COPY public.stats (id, player_id, "timestamp", rank, elo, wins, losses, goals_for, goals_against, streak, type) FROM stdin;
-\
-.
+\.
 
 
 --
@@ -38925,4 +38924,3 @@ ALTER TABLE ONLY public.teams
 --
 -- PostgreSQL database dump complete
 --
-
