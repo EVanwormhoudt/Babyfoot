@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -6,7 +6,19 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+ARG PUBLIC_API_BASE=""
+ENV PUBLIC_API_BASE=${PUBLIC_API_BASE}
+RUN npm run build
 
-EXPOSE 5173
+FROM node:22-alpine
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY --from=builder /app/build ./build
+
+EXPOSE 3000
+
+CMD ["node", "build"]
