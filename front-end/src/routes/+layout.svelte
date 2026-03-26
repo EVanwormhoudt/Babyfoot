@@ -24,7 +24,6 @@
         {href: '/leaderboard', label: 'Classement'},
         {href: '/matches', label: 'Matchs'},
         {href: '/create', label: 'Nouveau'},
-        {href: '/players', label: 'Joueurs'},
         {href: '/stats', label: 'Statistiques'}
     ];
 
@@ -163,15 +162,6 @@
                         <Moon class="size-4"/>
                     {/if}
                 </button>
-                <a
-                        href="/create"
-                        class="inline-flex h-9 items-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_10px_24px_rgba(0,107,36,0.24)]"
-                >
-                    Log Match
-                </a>
-                <div class="grid h-9 w-9 place-items-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground">
-                    {initials(mePlayer?.player_name ?? selectablePlayers[0]?.player_name)}
-                </div>
             </div>
         </nav>
     </div>
