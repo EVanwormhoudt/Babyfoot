@@ -1,28 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 @layer base {
     :root {
-        --background: 0 0% 100%;
-        --foreground: 240 10% 3.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 240 10% 3.9%;
+        --background: 210 12% 95%;
+        --foreground: 210 16% 16%;
+        --card: 0 0% 99%;
+        --card-foreground: 210 16% 16%;
         --popover: 0 0% 100%;
-        --popover-foreground: 240 10% 3.9%;
-        --primary: 142.1 76.2% 36.3%;
-        --primary-foreground: 355.7 100% 97.3%;
-        --secondary: 240 4.8% 95.9%;
-        --secondary-foreground: 240 5.9% 10%;
-        --muted: 240 4.8% 95.9%;
-        --muted-foreground: 240 3.8% 46.1%;
-        --accent: 240 4.8% 95.9%;
-        --accent-foreground: 240 5.9% 10%;
-        --destructive: 0 72.22% 50.59%;
+        --popover-foreground: 210 16% 16%;
+        --primary: 140 100% 23%;
+        --primary-foreground: 0 0% 100%;
+        --primary-container: 134 86% 74%;
+        --primary-container-foreground: 141 90% 17%;
+        --secondary: 210 11% 91%;
+        --secondary-foreground: 206 15% 31%;
+        --muted: 210 10% 89%;
+        --muted-foreground: 210 9% 42%;
+        --accent: 135 78% 59%;
+        --accent-foreground: 140 100% 16%;
+        --destructive: 0 72% 46%;
         --destructive-foreground: 0 0% 98%;
-        --border: 240 5.9% 90%;
-        --input: 240 5.9% 90%;
-        --ring: 142.1 76.2% 36.3%;
-        --radius: 0.5rem;
+        --border: 210 10% 82%;
+        --input: 210 10% 85%;
+        --ring: 140 100% 21%;
+        --radius: 0.75rem;
+        --surface-container-low: 210 11% 92%;
+        --surface-container-high: 210 10% 86%;
+        --ticker-bg: 223 66% 11%;
+        --team-red: 2 70% 52%;
+        --team-red-soft: 2 70% 93%;
+        --team-blue: 214 70% 51%;
+        --team-blue-soft: 214 70% 93%;
     }
 
     .dark {
@@ -38,13 +50,22 @@
         --secondary-foreground: 0 0% 98%;
         --muted: 0 0% 15%;
         --muted-foreground: 240 5% 64.9%;
-        --accent: 12 6.5% 15.1%;
+        --accent: 142 56% 42%;
         --accent-foreground: 0 0% 98%;
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 0 85.7% 97.3%;
+        --destructive: 4 78% 56%;
+        --destructive-foreground: 0 0% 100%;
         --border: 240 3.7% 15.9%;
         --input: 240 3.7% 15.9%;
         --ring: 142.4 71.8% 29.2%;
+        --surface-container-low: 156 5% 16%;
+        --surface-container-high: 156 6% 22%;
+        --ticker-bg: 223 66% 8%;
+        --primary-container: 142 46% 28%;
+        --primary-container-foreground: 136 64% 86%;
+        --team-red: 2 74% 60%;
+        --team-red-soft: 2 34% 23%;
+        --team-blue: 212 68% 62%;
+        --team-blue-soft: 212 30% 22%;
     }
 }
 
@@ -53,7 +74,105 @@
         @apply border-border;
     }
 
+    @media (prefers-reduced-motion: no-preference) {
+        html.theme-switching *,
+        html.theme-switching *::before,
+        html.theme-switching *::after {
+            transition-duration: 240ms;
+            transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow;
+            transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+        }
+    }
+
     body {
-        @apply bg-background text-foreground;
+        @apply text-foreground;
+        font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        background-color: hsl(var(--background));
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    .font-display {
+        font-family: 'Space Grotesk', 'Inter', sans-serif;
+        letter-spacing: -0.015em;
+    }
+
+    .dark body {
+        background-color: hsl(var(--background));
+    }
+}
+
+@layer components {
+    .editorial-kicker {
+        color: hsl(var(--muted-foreground));
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+    }
+
+    .surface-low {
+        background-color: hsl(var(--surface-container-low));
+        border: 1px solid hsl(var(--border) / 0.75);
+    }
+
+    .surface-high {
+        background-color: hsl(var(--surface-container-high));
+        border: 1px solid hsl(var(--border) / 0.7);
+    }
+
+    .tone-accent-soft {
+        background-color: hsl(var(--primary-container) / 0.3);
+        color: hsl(var(--primary-container-foreground));
+    }
+
+    .tone-positive {
+        color: hsl(var(--primary));
+    }
+
+    .tone-negative {
+        color: hsl(var(--destructive));
+    }
+
+    .tone-team-red {
+        background-color: hsl(var(--team-red-soft));
+        color: hsl(var(--team-red));
+    }
+
+    .tone-team-blue {
+        background-color: hsl(var(--team-blue-soft));
+        color: hsl(var(--team-blue));
+    }
+
+    .panel-lift {
+        background-color: hsl(var(--card));
+        box-shadow: 0 20px 40px rgba(12, 15, 16, 0.06);
+    }
+
+    .pitch-ticker {
+        background-color: hsl(var(--ticker-bg));
+        color: hsl(var(--accent));
+        overflow: hidden;
+        white-space: nowrap;
+    }
+
+    .pitch-ticker-track {
+        animation: ticker-marquee 34s linear infinite;
+        display: inline-flex;
+        gap: 1.75rem;
+        min-width: max-content;
+        padding-inline: 1.25rem;
+    }
+}
+
+@keyframes ticker-marquee {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-50%);
     }
 }

@@ -3,31 +3,39 @@
     import {Select as SelectPrimitive, type WithoutChild} from "bits-ui";
     import {cn} from "$lib/utils.js";
 
+    type SelectItemProps = WithoutChild<SelectPrimitive.ItemProps> & {
+        showIndicator?: boolean;
+    };
+
     let {
         ref = $bindable(null),
         class: className,
         value,
         label,
+        showIndicator = true,
         children: childrenProp,
         ...restProps
-    }: WithoutChild<SelectPrimitive.ItemProps> = $props();
+    }: SelectItemProps = $props();
 </script>
 
 <SelectPrimitive.Item
         {...restProps}
 	{value}
 	class={cn(
-		"data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+		"data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        showIndicator ? "pl-8 pr-2" : "px-3",
 		className
 	)}
         bind:ref
 >
     {#snippet children({selected, highlighted})}
-		<span class="absolute left-2 flex size-3.5 items-center justify-center">
-			{#if selected}
-				<Check class="size-4"/>
-			{/if}
-		</span>
+        {#if showIndicator}
+            <span class="absolute left-2 flex size-3.5 items-center justify-center">
+                {#if selected}
+                    <Check class="size-4"/>
+                {/if}
+            </span>
+        {/if}
         {#if childrenProp}
             {@render childrenProp({selected, highlighted})}
         {:else}

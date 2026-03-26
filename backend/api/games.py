@@ -5,12 +5,12 @@ from typing import Dict, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func
+from sqlalchemy import func, and_, or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from .db_errors import map_integrity_error
-from ..db.models import Game, Team, Player
+from ..db.models import Game, Team, Player, GamePlayerRatingChange
 from ..db.session import get_session
 from ..ranking import (
     recalculate_all_ratings,
@@ -202,10 +202,70 @@ def update_game(game_id: int, payload: GameUpdate, session: Session = Depends(ge
 
 @router.delete("/{game_id}", status_code=204)
 def delete_game(game_id: int, session: Session = Depends(get_session)):
-    g = session.get(Game, game_id)
+    g = session.exec(
+        select(Game)
+        .where(Game.id == game_id)
+        .options(selectinload(Game.teams), selectinload(Game.rating_changes))
+    ).first()
     if not g:
         raise HTTPException(404, "Match introuvable")
+
+    # Fast path: when deleting the latest game, restore impacted players from
+    # the stored per-game snapshots and avoid a full replay of history.
+    if g.rating_changes:
+        if g.game_timestamp is None:
+            newer_exists = session.exec(
+                select(Game.id).where(Game.id > g.id).limit(1)
+            ).first() is not None
+        else:
+            newer_exists = session.exec(
+                select(Game.id).where(
+                    or_(
+                        Game.game_timestamp > g.game_timestamp,
+                        and_(Game.game_timestamp == g.game_timestamp, Game.id > g.id),
+                    )
+                ).limit(1)
+            ).first() is not None
+
+        if not newer_exists:
+            player_ids = sorted({row.player_id for row in g.rating_changes})
+            players = session.exec(
+                select(Player)
+                .where(Player.id.in_(player_ids))
+                .options(selectinload(Player.rating))
+            ).all()
+            players_by_id = {p.id: p for p in players}
+
+            if all(players_by_id.get(pid) and players_by_id[pid].rating for pid in player_ids):
+                now = datetime.now(tz=settings.tz)
+                try:
+                    for row in g.rating_changes:
+                        player = players_by_id[row.player_id]
+                        player.rating.set_mu(row.rating_type, row.mu_before)
+                        player.rating.set_sigma(row.rating_type, row.sigma_before)
+                        player.rating.last_updated = now
+
+                    for row in g.rating_changes:
+                        session.delete(row)
+                    for team in g.teams:
+                        session.delete(team)
+                    session.delete(g)
+                    session.commit()
+                    return None
+                except IntegrityError as e:
+                    session.rollback()
+                    raise map_integrity_error(e, "Echec de suppression du match (contrainte base de donnees)")
+                except Exception as e:
+                    session.rollback()
+                    raise HTTPException(500, f"Echec de suppression du match : {e}")
+
     try:
+        rating_changes = session.exec(
+            select(GamePlayerRatingChange).where(GamePlayerRatingChange.game_id == game_id)
+        ).all()
+        for row in rating_changes:
+            session.delete(row)
+
         teams = session.exec(select(Team).where(Team.game_id == game_id)).all()
         for team in teams:
             session.delete(team)

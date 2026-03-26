@@ -8,45 +8,99 @@
     import {toast} from "svelte-sonner";
     import * as Card from "$lib/components/ui/card/index.js";
 
-    type PlayerLite = { id: number; player_name: string; player_color: string; active: boolean };
-    type DndItem = { id: number; name: string; color?: string };
+    type PlayerLite = {
+        id: number;
+        player_name: string;
+        player_color: string;
+        active: boolean;
+        played_this_year?: boolean;
+        matches_this_year?: number;
+    };
+    type DndItem = {
+        id: number;
+        name: string;
+        color?: string;
+        playedThisYear: boolean;
+        matchesThisYear: number;
+    };
 
     // props (Svelte 5)
     let { data } = $props<{ data: { playersLite: PlayerLite[] } }>();
     const playersLite: PlayerLite[] = Array.isArray(data?.playersLite) ? data.playersLite : [];
 
     // Column IDs
-    const COL_PLAYERS = 1;
+    const COL_PLAYERS_FRESH = 1;
     const COL_RED = 2;
     const COL_BLUE = 3;
+    const COL_PLAYERS_PLAYED = 4;
+
+    function normalizeItem(player: PlayerLite): DndItem {
+        return {
+            id: player.id,
+            name: player.player_name,
+            color: player.player_color,
+            playedThisYear: !!player.played_this_year,
+            matchesThisYear: Number(player.matches_this_year ?? 0)
+        };
+    }
+
+    function sortByPriority(a: DndItem, b: DndItem) {
+        if (a.matchesThisYear !== b.matchesThisYear) return a.matchesThisYear - b.matchesThisYear;
+        return a.name.localeCompare(b.name, undefined, {sensitivity: 'base'});
+    }
+
+    function poolColumnForItem(item: DndItem) {
+        return item.playedThisYear ? COL_PLAYERS_PLAYED : COL_PLAYERS_FRESH;
+    }
 
     // DnD columns use $state so nested mutations are reactive
     let columnItems = $state<
         { id: number; name: string; class: string; items: DndItem[] }[]
     >([
         {
-            id: COL_PLAYERS,
-            name: "Joueurs",
+            id: COL_PLAYERS_FRESH,
+            name: "Priorite",
             class: "players",
             items: playersLite
                 .filter((p) => p.active)
-                .map((p) => ({ id: p.id, name: p.player_name, color: p.player_color }))
+                .map(normalizeItem)
+                .filter((p) => !p.playedThisYear)
+                .sort(sortByPriority)
+        },
+        {
+            id: COL_PLAYERS_PLAYED,
+            name: "Deja joues cette annee",
+            class: "players-played",
+            items: playersLite
+                .filter((p) => p.active)
+                .map(normalizeItem)
+                .filter((p) => p.playedThisYear)
+                .sort(sortByPriority)
         },
         { id: COL_RED, name: "Equipe rouge", class: "team-red", items: [] },
         { id: COL_BLUE, name: "Equipe bleue", class: "team-blue", items: [] }
     ]);
 
-    // layout derived from current players pool (5 columns, 55px row height)
-    const totalItems = $derived(columnItems[0].items.length);
-    const rows = $derived(Math.max(1, Math.ceil(totalItems / 5)));
-    const height = $derived(`${rows * 55}px`);
+    const freshPool = $derived(columnItems.find((c) => c.id === COL_PLAYERS_FRESH));
+    const playedPool = $derived(columnItems.find((c) => c.id === COL_PLAYERS_PLAYED));
+    const freshItems = $derived(freshPool?.items ?? []);
+    const playedItems = $derived(playedPool?.items ?? []);
+    const totalAvailable = $derived(freshItems.length + playedItems.length);
+
+    // layout derived from each pool (5 columns, 55px row height)
+    const freshRows = $derived(Math.max(1, Math.ceil(freshItems.length / 5)));
+    const playedRows = $derived(Math.max(1, Math.ceil(playedItems.length / 5)));
+    const freshHeight = $derived(`${freshRows * 55}px`);
+    const playedHeight = $derived(`${playedRows * 55}px`);
+
+    let showPlayedPool = $state(false);
 
     const flipDurationMs = 180;
     const dropTargetStyle = {};
     const dropTargetStyleMain = {};
-    const dropTargetClassesMain = ['ring-2', 'ring-emerald-400/70', 'bg-emerald-500/10'];
-    const dropTargetClassesRed = ['ring-2', 'ring-red-400/70', 'bg-red-500/10'];
-    const dropTargetClassesBlue = ['ring-2', 'ring-blue-400/70', 'bg-blue-500/10'];
+    const dropTargetClassesMain = ['ring-2', 'ring-primary/60', 'bg-primary/10'];
+    const dropTargetClassesRed = ['ring-2', 'ring-[hsl(var(--team-red)/0.65)]', 'bg-[hsl(var(--team-red-soft)/0.7)]'];
+    const dropTargetClassesBlue = ['ring-2', 'ring-[hsl(var(--team-blue)/0.65)]', 'bg-[hsl(var(--team-blue-soft)/0.7)]'];
 
     function transformDraggedElement(el?: HTMLElement) {
         if (!el) return;
@@ -120,28 +174,49 @@
     let submitting = $state(false);
     let lastGameId = $state<number | null>(null);
 
+    async function readApiError(res: Response, fallback: string): Promise<string> {
+        try {
+            const body = await res.json();
+            if (typeof body?.detail === "string" && body.detail.trim()) return body.detail;
+        } catch {
+            // ignore non-JSON payloads
+        }
+        try {
+            const text = await res.text();
+            if (text.trim()) return text;
+        } catch {
+            // ignore empty/unreadable body
+        }
+        return fallback;
+    }
+
     async function undoLastSubmission() {
         if (!lastGameId) {
             toast.error("Annulation impossible (aucun identifiant de match).");
             return;
         }
+        const gameIdToCancel = lastGameId;
+        const cancelPromise = (async () => {
+            const res = await fetch(`${GAMES_ENDPOINT}/${gameIdToCancel}`, {method: "DELETE"});
+            if (!res.ok) {
+                const msg = await readApiError(res, `Echec de l'annulation (${res.status})`);
+                throw new Error(msg);
+            }
+        })();
+
+        toast.promise(cancelPromise, {
+            loading: "Annulation...",
+            success: "Enregistrement annule.",
+            error: (e: unknown) => e instanceof Error ? e.message : "Echec de l'annulation."
+        });
+
         try {
-            toast.promise(
-                (async () => {
-                    const res = await fetch(`${GAMES_ENDPOINT}/${lastGameId}`, {method: "DELETE"});
-                    if (!res.ok) {
-                        const t = await res.text().catch(() => "");
-                        throw new Error(t || `Echec de l'annulation (${res.status})`);
-                    }
-                })(),
-                {
-                    loading: "Annulation...",
-                    success: "Enregistrement annule.",
-                    error: (e: unknown) => e instanceof Error ? e.message : "Echec de l'annulation."
-                }
-            );
-            lastGameId = null;
-        } catch { /* toast.promise handled error */
+            await cancelPromise;
+            if (lastGameId === gameIdToCancel) {
+                lastGameId = null;
+            }
+        } catch {
+            // toast.promise already handled error message
         }
     }
 
@@ -199,8 +274,8 @@
                     body: JSON.stringify(payload)
                 });
                 if (!res.ok) {
-                    const text = await res.text().catch(() => "");
-                    throw new Error(text || `La requete a echoue (${res.status})`);
+                    const msg = await readApiError(res, `La requete a echoue (${res.status})`);
+                    throw new Error(msg);
                 }
                 return await res.json().catch(() => ({}));
             })();
@@ -225,25 +300,32 @@
 </script>
 
 <div class="create-match mx-auto max-w-[1400px] space-y-6 px-4 py-4">
-    <Card.Root class="overflow-hidden rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/15 via-background to-background/95 shadow-[0_18px_45px_rgba(0,0,0,0.25)]">
+    <Card.Root class="overflow-hidden rounded-3xl bg-[hsl(var(--surface-container-low))] dark:shadow-[0_18px_45px_rgba(0,0,0,0.25)]">
         <Card.Header class="relative pb-2">
-            <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.15),transparent_45%)]"></div>
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.2),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.15),transparent_45%)]"></div>
             <div class="relative flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <Card.Title class="text-3xl font-black tracking-tight">Creer un match</Card.Title>
                     <Card.Description>Glissez les joueurs dans les equipes rouge et bleue, puis validez le score.</Card.Description>
                     <p class="mt-1 text-xs text-muted-foreground">Astuce : vous pouvez aussi reordonner les joueurs a l'interieur d'une equipe.</p>
                 </div>
-                <div class="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                    {columnItems[0].items.length} joueurs disponibles
+                <div class="rounded-full bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+                    {totalAvailable} joueurs disponibles
                 </div>
             </div>
         </Card.Header>
-        <Card.Content class="pt-2">
-            <section
-                    class="grid grid-cols-2 justify-items-center gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
-                    use:dndzone={{
-				items: columnItems[0].items,
+        <Card.Content class="space-y-4 pt-2">
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <p class="editorial-kicker">Priorite • pas joue cette annee</p>
+                    <span class="rounded-full bg-card px-2.5 py-0.5 text-xs text-muted-foreground">
+                        {freshItems.length}
+                    </span>
+                </div>
+                <section
+                        class="grid grid-cols-2 justify-items-center gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+                        use:dndzone={{
+				items: freshItems,
 				type: 'player',
 					flipDurationMs,
 					dropTargetStyle: dropTargetStyleMain,
@@ -251,48 +333,105 @@
 					centreDraggedOnCursor: true,
 					transformDraggedElement
 				}}
-                    onconsider={(e) => handleDndConsiderCards(columnItems[0].id, e)}
-                    onfinalize={(e) => handleDndFinalizeCards(columnItems[0].id, e)}
-                    style="height: {height};"
-            >
-                {#each columnItems[0].items as item (item.id)}
-                    <div
-                            animate:flip={{duration: flipDurationMs}}
-                            class="relative group h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl border border-emerald-500/30 bg-card/95 px-3 text-[15px] font-semibold text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.2)] transition hover:border-emerald-400/70 hover:bg-emerald-500/12 active:cursor-grabbing"
-                            title={item.name}
-                    >
-                        <div class="flex h-full items-center justify-between gap-2">
-                            <div class="flex min-w-0 items-center gap-2">
-                                <span class="truncate">{item.name}</span>
+                        onconsider={(e) => handleDndConsiderCards(COL_PLAYERS_FRESH, e)}
+                        onfinalize={(e) => handleDndFinalizeCards(COL_PLAYERS_FRESH, e)}
+                        style="height: {freshHeight};"
+                >
+                    {#each freshItems as item (item.id)}
+                        <div
+                                animate:flip={{duration: flipDurationMs}}
+                                class="relative group h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl border border-primary/30 bg-card/95 px-3 text-[15px] font-semibold text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.2)] transition hover:border-primary/55 hover:bg-primary/10 active:cursor-grabbing"
+                                title={item.name}
+                        >
+                            <div class="flex h-full items-center justify-between gap-2">
+                                <div class="flex min-w-0 items-center gap-2">
+                                    <span class="truncate">{item.name}</span>
+                                </div>
+                                <span class="text-muted-foreground">⠿</span>
                             </div>
-                            <span class="text-muted-foreground">⠿</span>
-                        </div>
 
-                        <div class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-                            <button
-                                    class="h-6 w-6 rounded-full bg-red-700 text-white text-[10px] font-semibold grid place-items-center shadow"
-                                    title="Envoyer en rouge"
-                                    onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
-                            >R</button>
-                            <button
-                                    class="h-6 w-6 rounded-full bg-blue-700 text-white text-[10px] font-semibold grid place-items-center shadow"
-                                    title="Envoyer en bleu"
-                                    onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
-                            >B</button>
+                            <div class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                                <button
+                                        class="h-6 w-6 rounded-full bg-[hsl(var(--team-red))] text-white text-[10px] font-semibold grid place-items-center shadow"
+                                        title="Envoyer en rouge"
+                                        onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
+                                >R</button>
+                                <button
+                                        class="h-6 w-6 rounded-full bg-[hsl(var(--team-blue))] text-white text-[10px] font-semibold grid place-items-center shadow"
+                                        title="Envoyer en bleu"
+                                        onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
+                                >B</button>
+                            </div>
                         </div>
-                    </div>
-                {/each}
-            </section>
+                    {/each}
+                </section>
+            </div>
+
+            <div class="space-y-2">
+                <button
+                        class="flex w-full items-center justify-between rounded-xl bg-card px-3 py-2 text-sm text-foreground hover:bg-card/80"
+                        onclick={() => (showPlayedPool = !showPlayedPool)}
+                >
+                    <span>A deja joue cette annee ({playedItems.length})</span>
+                    <span class="text-muted-foreground">{showPlayedPool ? 'Masquer' : 'Afficher'}</span>
+                </button>
+
+                {#if showPlayedPool}
+                    <section
+                            class="grid grid-cols-2 justify-items-center gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+                            use:dndzone={{
+				items: playedItems,
+				type: 'player',
+					flipDurationMs,
+					dropTargetStyle: dropTargetStyleMain,
+					dropTargetClasses: dropTargetClassesMain,
+					centreDraggedOnCursor: true,
+					transformDraggedElement
+				}}
+                            onconsider={(e) => handleDndConsiderCards(COL_PLAYERS_PLAYED, e)}
+                            onfinalize={(e) => handleDndFinalizeCards(COL_PLAYERS_PLAYED, e)}
+                            style="height: {playedHeight};"
+                    >
+                        {#each playedItems as item (item.id)}
+                            <div
+                                    animate:flip={{duration: flipDurationMs}}
+                                    class="relative group h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl border border-border/60 bg-card/85 px-3 text-[15px] font-semibold text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.2)] transition hover:border-primary/35 hover:bg-primary/5 active:cursor-grabbing"
+                                    title={item.name}
+                            >
+                                <div class="flex h-full items-center justify-between gap-2">
+                                    <div class="flex min-w-0 items-center gap-2">
+                                        <span class="truncate">{item.name}</span>
+                                    </div>
+                                    <span class="text-[11px] text-muted-foreground">{item.matchesThisYear}</span>
+                                </div>
+
+                                <div class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                                    <button
+                                            class="h-6 w-6 rounded-full bg-[hsl(var(--team-red))] text-white text-[10px] font-semibold grid place-items-center shadow"
+                                            title="Envoyer en rouge"
+                                            onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
+                                    >R</button>
+                                    <button
+                                            class="h-6 w-6 rounded-full bg-[hsl(var(--team-blue))] text-white text-[10px] font-semibold grid place-items-center shadow"
+                                            title="Envoyer en bleu"
+                                            onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
+                                    >B</button>
+                                </div>
+                            </div>
+                        {/each}
+                    </section>
+                {/if}
+            </div>
         </Card.Content>
     </Card.Root>
 
     <div class="grid items-start gap-4 xl:grid-cols-[1fr_420px_1fr]">
-        {#each columnItems.slice(1, 2) as column (column.id)}
-            <Card.Root class="rounded-3xl border border-red-500/25 bg-gradient-to-b from-red-950/20 to-background">
+        {#each columnItems.filter((c) => c.id === COL_RED) as column (column.id)}
+            <Card.Root class="rounded-3xl bg-[hsl(var(--surface-container-low))]">
                 <Card.Header class="pb-2">
                     <div class="flex items-center justify-between">
                         <Card.Title class="text-xl">Equipe rouge</Card.Title>
-                        <span class="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 text-xs text-red-200">
+                        <span class="tone-team-red rounded-full px-2.5 py-0.5 text-xs">
                             {column.items.length} joueurs
                         </span>
                     </div>
@@ -315,7 +454,7 @@
                         {#each column.items as item (item.id)}
                             <div
                                     animate:flip={{duration: flipDurationMs}}
-                                    class="relative group h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl border border-red-500/30 bg-card/95 px-3 text-[15px] font-semibold text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.2)] transition hover:border-blue-500/55 hover:bg-blue-500/12 active:cursor-grabbing"
+                                    class="relative group h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl border border-[hsl(var(--team-red)/0.35)] bg-card/95 px-3 text-[15px] font-semibold text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.2)] transition hover:border-[hsl(var(--team-blue)/0.45)] hover:bg-[hsl(var(--team-blue-soft)/0.55)] active:cursor-grabbing"
                             >
                                 <div class="flex h-full items-center justify-between gap-2">
                                     <div class="flex min-w-0 items-center gap-2">
@@ -326,14 +465,14 @@
 
                                 <div class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
                                     <button
-                                            class="h-6 w-6 rounded-full bg-blue-700 text-white text-[10px] font-semibold grid place-items-center shadow"
+                                            class="h-6 w-6 rounded-full bg-[hsl(var(--team-blue))] text-white text-[10px] font-semibold grid place-items-center shadow"
                                             title="Deplacer en bleu"
                                             onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
                                     >B</button>
                                     <button
-                                            class="h-6 w-6 rounded-full bg-neutral-700 text-white text-[10px] font-semibold grid place-items-center shadow"
+                                            class="h-6 w-6 rounded-full bg-secondary text-secondary-foreground text-[10px] font-semibold grid place-items-center shadow"
                                             title="Retour aux joueurs"
-                                            onclick={withNoDrag(() => moveItemToColumn(item.id, COL_PLAYERS))}
+                                            onclick={withNoDrag(() => moveItemToColumn(item.id, poolColumnForItem(item)))}
                                     >X</button>
                                 </div>
                             </div>
@@ -343,7 +482,7 @@
             </Card.Root>
         {/each}
 
-            <Card.Root class="rounded-3xl border border-emerald-500/25 bg-gradient-to-b from-emerald-950/18 to-background">
+            <Card.Root class="rounded-3xl bg-[hsl(var(--surface-container-low))]">
                 <Card.Header>
                     <Card.Title class="text-xl">Valider le score</Card.Title>
                     <Card.Description>Entrez le score final des deux equipes.</Card.Description>
@@ -362,18 +501,18 @@
                 </div>
             </Card.Content>
             <Card.Footer class="flex flex-col items-center gap-2 pt-0">
-                <Button class="h-11 min-w-[170px] rounded-xl bg-emerald-500 text-black font-semibold hover:bg-emerald-400" onclick={submitScore} disabled={submitting}>
+                <Button class="h-11 min-w-[170px] rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onclick={submitScore} disabled={submitting}>
                     {submitting ? 'Envoi...' : 'Envoyer le score'}
                 </Button>
             </Card.Footer>
         </Card.Root>
 
-        {#each columnItems.slice(2, 3) as column (column.id)}
-            <Card.Root class="rounded-3xl border border-blue-500/25 bg-gradient-to-b from-blue-950/20 to-background">
+        {#each columnItems.filter((c) => c.id === COL_BLUE) as column (column.id)}
+            <Card.Root class="rounded-3xl bg-[hsl(var(--surface-container-low))]">
                 <Card.Header class="pb-2">
                     <div class="flex items-center justify-between">
                         <Card.Title class="text-xl">Equipe bleue</Card.Title>
-                        <span class="rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-xs text-blue-200">
+                        <span class="tone-team-blue rounded-full px-2.5 py-0.5 text-xs">
                             {column.items.length} joueurs
                         </span>
                     </div>
@@ -396,7 +535,7 @@
                         {#each column.items as item (item.id)}
                             <div
                                     animate:flip={{duration: flipDurationMs}}
-                                    class="relative group h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl border border-blue-500/30 bg-card/95 px-3 text-[15px] font-semibold text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.2)] transition hover:border-red-500/55 hover:bg-red-500/12 active:cursor-grabbing"
+                                    class="relative group h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl border border-[hsl(var(--team-blue)/0.35)] bg-card/95 px-3 text-[15px] font-semibold text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.2)] transition hover:border-[hsl(var(--team-red)/0.45)] hover:bg-[hsl(var(--team-red-soft)/0.55)] active:cursor-grabbing"
                             >
                                 <div class="flex h-full items-center justify-between gap-2">
                                     <div class="flex min-w-0 items-center gap-2">
@@ -407,14 +546,14 @@
 
                                 <div class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
                                     <button
-                                            class="h-6 w-6 rounded-full bg-red-700 text-white text-[10px] font-semibold grid place-items-center shadow"
+                                            class="h-6 w-6 rounded-full bg-[hsl(var(--team-red))] text-white text-[10px] font-semibold grid place-items-center shadow"
                                             title="Deplacer en rouge"
                                             onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
                                     >R</button>
                                     <button
-                                            class="h-6 w-6 rounded-full bg-neutral-700 text-white text-[10px] font-semibold grid place-items-center shadow"
+                                            class="h-6 w-6 rounded-full bg-secondary text-secondary-foreground text-[10px] font-semibold grid place-items-center shadow"
                                             title="Retour aux joueurs"
-                                            onclick={withNoDrag(() => moveItemToColumn(item.id, COL_PLAYERS))}
+                                            onclick={withNoDrag(() => moveItemToColumn(item.id, poolColumnForItem(item)))}
                                     >X</button>
                                 </div>
                             </div>

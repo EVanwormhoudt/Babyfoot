@@ -5,6 +5,12 @@ export type Scope = 'monthly' | 'yearly' | 'overall';
 export type F = typeof fetch;
 export type LeaderboardOpts = { year?: number; month?: number };
 export type StatsOpts = { year?: number; month?: number };
+export type PlayerLite = {
+    id: number;
+    player_name: string;
+    player_color: string;
+    active?: boolean;
+};
 export type TeammateStat = {
     player_id: number;
     player_name: string;
@@ -33,12 +39,33 @@ export type PlayerRatingHistoryPoint = {
     rank_type: Scope;
 };
 
+async function readApiError(res: Response, fallback: string): Promise<string> {
+    try {
+        const body = await res.json();
+        if (typeof body?.detail === 'string' && body.detail.trim()) {
+            return body.detail;
+        }
+    } catch {
+        // ignore non-JSON bodies
+    }
+
+    try {
+        const text = await res.text();
+        if (text.trim()) return text;
+    } catch {
+        // ignore empty body
+    }
+    return fallback;
+}
+
 export async function getPlayers(eventFetch?: F) {
     const f = eventFetch ?? fetch;
     // If you can, add a fields param on the backend to keep this light
     const res = await f(`${PUBLIC_API_BASE}/api/players`); // e.g. ...?fields=id,name,color,active
-    if (!res.ok) throw new Error('Impossible de charger les joueurs');
-    return res.json() as Promise<Array<{ id: number; player_name: string; player_color: string; active?: boolean }>>;
+    if (!res.ok) {
+        throw new Error(await readApiError(res, 'Impossible de charger les joueurs'));
+    }
+    return res.json() as Promise<PlayerLite[]>;
 }
 
 export async function createPlayer(data: { player_name: string; player_color: string }, eventFetch?: F) {
@@ -48,7 +75,10 @@ export async function createPlayer(data: { player_name: string; player_color: st
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
     });
-    return res.json();
+    if (!res.ok) {
+        throw new Error(await readApiError(res, `Impossible de creer le joueur (${res.status})`));
+    }
+    return res.json() as Promise<PlayerLite>;
 }
 
 export async function getPlayer(id: number, eventFetch?: F) {
@@ -64,7 +94,10 @@ export async function updatePlayer(id: number, data: any, eventFetch?: F) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
     });
-    return res.json();
+    if (!res.ok) {
+        throw new Error(await readApiError(res, `Impossible de mettre a jour le joueur (${res.status})`));
+    }
+    return res.json() as Promise<PlayerLite>;
 }
 
 export async function deletePlayer(id: number, eventFetch?: F) {

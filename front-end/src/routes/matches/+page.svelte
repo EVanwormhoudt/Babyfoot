@@ -3,17 +3,25 @@
 
     export let data: PageData;
 
-    // shadcn-svelte components
-    import * as Card from "$lib/components/ui/card/index.js";
     import {Button} from "$lib/components/ui/button/index.js";
+    import {Input} from "$lib/components/ui/input/index.js";
     import * as Pagination from "$lib/components/ui/pagination/index.js";
     import {RangeCalendar} from "$lib/components/ui/range-calendar/index.js";
-    import {Badge} from "$lib/components/ui/badge/index.js";
     import * as Popover from "$lib/components/ui/popover/index.js";
+    import {deleteGame, updateGame} from "$lib/api/matches";
     import {goto} from "$app/navigation";
+    import {toast} from "svelte-sonner";
     import {today, getLocalTimeZone, CalendarDate, type DateValue} from "@internationalized/date";
     import {page} from '$app/state';
 
+    type MatchItem = PageData['items'][number];
+    type MatchGroup = { key: string; label: string; matches: MatchItem[] };
+    let groupedMatches: MatchGroup[] = [];
+    let deletingId: number | null = null;
+    let editingMatch: MatchItem | null = null;
+    let savingEdit = false;
+    let editTeam1Score = '';
+    let editTeam2Score = '';
 
     function pushRangeToUrl(r?: { start?: DateValue; end?: DateValue }) {
         if (!r?.start || !r?.end) return;
@@ -30,13 +38,8 @@
         goto(`?${sp.toString()}`, {replaceState: true});
     }
 
-    // local helpers
-    function toLocal(dt: string) {
-        const d = new Date(dt);
-        return d.toLocaleString(undefined, {
-            year: 'numeric', month: 'short', day: '2-digit',
-            hour: '2-digit', minute: '2-digit'
-        });
+    function toTime(dt: string) {
+        return new Date(dt).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
     }
 
     // build/merge query params for navigation without losing others
@@ -49,51 +52,175 @@
         return u.toString();
     }
 
-    function getOverallChange(game: any, playerId: number): { delta: number; muAfter: number } | null {
-        const change = game.rating_changes?.find(
-            (item: any) => item.player_id === playerId && item.rating_type === 'overall'
-        );
-        if (typeof change?.delta_mu !== 'number' || typeof change?.mu_after !== 'number') {
-            return null;
-        }
-        return {
-            delta: change.delta_mu,
-            muAfter: change.mu_after
-        };
+    function dayKey(dt: string) {
+        const d = new Date(dt);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
     }
 
-    function formatDelta(delta: number) {
+    function dayLabel(dt: string) {
+        const target = new Date(dt);
+        const now = new Date();
+        const targetMidnight = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+        const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const diffDays = Math.round((nowMidnight.getTime() - targetMidnight.getTime()) / 86_400_000);
+
+        if (diffDays === 0) return "Aujourd'hui";
+        if (diffDays === 1) return 'Hier';
+
+        return target.toLocaleDateString(undefined, {
+            weekday: 'long',
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric'
+        });
+    }
+
+    function groupMatchesByDate(items: MatchItem[]): MatchGroup[] {
+        const groups = new Map<string, MatchGroup>();
+
+        for (const match of items) {
+            const key = dayKey(match.game_timestamp);
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    key,
+                    label: dayLabel(match.game_timestamp),
+                    matches: []
+                });
+            }
+            groups.get(key)?.matches.push(match);
+        }
+
+        return Array.from(groups.values());
+    }
+
+    function teamPlayers(game: MatchItem, teamNumber: 1 | 2) {
+        return game.teams.filter((t) => t.team_number === teamNumber);
+    }
+
+    function getOverallDelta(game: MatchItem, playerId: number) {
+        const change = game.rating_changes?.find((item) => item.player_id === playerId && item.rating_type === 'overall');
+        return typeof change?.delta_mu === 'number' ? change.delta_mu : null;
+    }
+
+    function formatDelta(delta: number | null) {
+        if (delta === null) return null;
         const sign = delta > 0 ? '+' : '';
         return `${sign}${delta.toFixed(1)}`;
     }
 
-    function formatElo(mu: number) {
-        return `Elo ${mu.toFixed(1)}`;
-    }
-
-    function statsHref(playerId: number) {
-        return `/stats?player_id=${playerId}&scope=overall`;
-    }
-
-    function teamPanelClass(won: boolean) {
-        return won
-            ? 'border-emerald-500/30 bg-emerald-500/10'
-            : 'border-border/60 bg-background/60';
-    }
-
-    function playerChipClass(won: boolean) {
-        return won
-            ? 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-400/25'
-            : 'bg-muted/70 text-foreground/85 ring-1 ring-border/60';
-    }
-
-    function deltaClass(delta: number) {
-        if (delta > 0) return 'text-emerald-400';
-        if (delta < 0) return 'text-rose-400';
+    function deltaClass(delta: number | null) {
+        if (delta === null) return 'text-muted-foreground';
+        if (delta > 0) return 'tone-positive';
+        if (delta < 0) return 'tone-negative';
         return 'text-muted-foreground';
     }
 
+    function winnerTeam(game: MatchItem): 0 | 1 | 2 {
+        const s1 = game.result_team1 ?? 0;
+        const s2 = game.result_team2 ?? 0;
+        if (s1 === s2) return 0;
+        return s1 > s2 ? 1 : 2;
+    }
+
+    function scoreClass(sideScore: number, otherScore: number) {
+        if (sideScore > otherScore) return 'tone-positive';
+        return 'text-foreground';
+    }
+
+    type TeamOutcome = 'winner' | 'defeated' | 'draw';
+
+    function teamOutcome(game: MatchItem, teamNumber: 1 | 2): TeamOutcome {
+        const winner = winnerTeam(game);
+        if (winner === 0) return 'draw';
+        return winner === teamNumber ? 'winner' : 'defeated';
+    }
+
+    function outcomeLabel(outcome: TeamOutcome) {
+        if (outcome === 'winner') return 'Winner';
+        if (outcome === 'defeated') return 'Defeated';
+        return 'Draw';
+    }
+
+    function outcomeClass(outcome: TeamOutcome) {
+        if (outcome === 'winner') return 'tone-positive';
+        if (outcome === 'defeated') return 'tone-negative';
+        return 'text-muted-foreground';
+    }
+
+    function openEditModal(game: MatchItem) {
+        editingMatch = game;
+        editTeam1Score = String(game.result_team1 ?? 0);
+        editTeam2Score = String(game.result_team2 ?? 0);
+    }
+
+    function closeEditModal() {
+        if (savingEdit) return;
+        editingMatch = null;
+        editTeam1Score = '';
+        editTeam2Score = '';
+    }
+
+    async function handleSaveEdit(event: SubmitEvent) {
+        event.preventDefault();
+        if (!editingMatch) return;
+
+        const s1 = Number(editTeam1Score);
+        const s2 = Number(editTeam2Score);
+
+        if (!Number.isInteger(s1) || !Number.isInteger(s2)) {
+            toast.error('Les scores doivent etre des nombres entiers.');
+            return;
+        }
+        if (s1 < 0 || s2 < 0) {
+            toast.error('Les scores ne peuvent pas etre negatifs.');
+            return;
+        }
+        if (s1 === s2) {
+            toast.error('Les scores ne peuvent pas etre egaux.');
+            return;
+        }
+
+        const gameId = editingMatch.id;
+        savingEdit = true;
+        try {
+            await updateGame(gameId, {
+                result_team1: s1,
+                result_team2: s2
+            });
+
+            toast.success(`Match #${gameId} modifie.`);
+            closeEditModal();
+            await goto(`?${buildQuery({})}`, {replaceState: true, invalidateAll: true});
+        } catch (error: unknown) {
+            console.error(error);
+            const message = error instanceof Error ? error.message : 'Impossible de modifier ce match.';
+            toast.error(message);
+        } finally {
+            savingEdit = false;
+        }
+    }
+
+    async function handleDeleteMatch(gameId: number) {
+        if (!confirm(`Supprimer le match #${gameId} ?`)) return;
+        deletingId = gameId;
+
+        try {
+            const ok = await deleteGame(gameId);
+            if (!ok) throw new Error('Suppression refusée par l’API');
+            await goto(`?${buildQuery({})}`, {replaceState: true, invalidateAll: true});
+        } catch (error) {
+            console.error(error);
+            alert('Impossible de supprimer ce match.');
+        } finally {
+            deletingId = null;
+        }
+    }
+
     let range: any | undefined;
+    $: groupedMatches = groupMatchesByDate(data.items);
 
     // Initialize from URL on first run (so the picker reflects current filters)
     $: if (range?.start && range?.end) {
@@ -129,7 +256,8 @@
 </script>
 
 <!-- Filters -->
-<div class="mb-6 mt-3 rounded-2xl border border-border/60 bg-background/60 p-3">
+<div class="mx-auto mt-3 max-w-[1400px] space-y-4 px-4">
+<div class="surface-low rounded-2xl p-3">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <p class="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Filtres matchs</p>
         <div class="flex flex-wrap items-center gap-2">
@@ -147,117 +275,186 @@
             </Popover.Root>
             <Button onclick={() => setMonth(0)} variant="secondary">Ce mois-ci</Button>
             <Button onclick={() => setMonth(-1)} variant="ghost">Mois precedent</Button>
-            <Button onclick={clearDates} variant="destructive">Effacer</Button>
+            <Button
+                    onclick={clearDates}
+                    variant="ghost"
+                    class="border border-destructive/60 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+                Effacer
+            </Button>
         </div>
     </div>
 </div>
 
-<!-- Matches list -->
-<div class="grid gap-4 sm:grid-cols-2">
+<div class="flex items-center justify-between px-1">
+    <p class="editorial-kicker">Historique des matchs</p>
+    <p class="text-xs text-muted-foreground">{data.limit} matchs par page</p>
+</div>
+
+<!-- Grouped match rows -->
+<div class="space-y-6">
     {#if data.items.length === 0}
-        <Card.Root>
-            <Card.Content class="py-8 text-center text-muted-foreground">
-                Pas de matchs trouvés avec les filtres actuels.
-            </Card.Content>
-        </Card.Root>
+        <div class="surface-low rounded-3xl px-6 py-12 text-center text-sm text-muted-foreground">
+            Pas de matchs trouvés avec les filtres actuels.
+        </div>
     {:else}
-        {#each data.items as game (game.id)}
-            {@const s1 = game.result_team1 ?? 0}
-            {@const s2 = game.result_team2 ?? 0}
-            {@const t1 = game.teams.filter((t) => t.team_number === 1)}
-            {@const t2 = game.teams.filter((t) => t.team_number === 2)}
-            {@const t1Wins = s1 > s2}
-            {@const t2Wins = s2 > s1}
+        {#each groupedMatches as group (group.key)}
+            <section class="space-y-3">
+                <div class="flex items-center gap-3 px-1">
+                    <h2 class="text-sm font-semibold text-muted-foreground">{group.label}</h2>
+                    <div class="h-px flex-1 bg-border/60"></div>
+                </div>
+                <div class="space-y-3">
+                    {#each group.matches as game (game.id)}
+                        {@const s1 = game.result_team1 ?? 0}
+                        {@const s2 = game.result_team2 ?? 0}
+                        {@const outcome1 = teamOutcome(game, 1)}
+                        {@const outcome2 = teamOutcome(game, 2)}
+                        {@const team1Players = teamPlayers(game, 1)}
+                        {@const team2Players = teamPlayers(game, 2)}
+                        <div class="rounded-2xl border border-border/65 bg-card/90 px-4 py-4">
+                            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                <div class="overflow-x-auto">
+                                    <div class="grid min-w-[640px] grid-cols-[minmax(0,170px)_auto_auto_minmax(0,170px)_auto] items-center gap-x-4">
+                                        <div class="min-w-0 space-y-1.5">
+                                            <p class={`editorial-kicker ${outcomeClass(outcome1)}`}>{outcomeLabel(outcome1)}</p>
+                                            {#each team1Players as player}
+                                                <p class="truncate text-[1.05rem] font-semibold">{player.player.player_name ?? `P${player.player_id}`}</p>
+                                            {/each}
+                                        </div>
 
-            <Card.Root
-                    class="group relative overflow-hidden rounded-3xl border border-emerald-500/15 bg-gradient-to-br from-emerald-950/10 via-background to-background/90 shadow-[0_10px_32px_rgba(0,0,0,0.2)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(16,185,129,0.16)]">
-                <div
-                        class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.15),transparent_45%)]"></div>
+                                        <div class="space-y-1.5 pt-5 text-right">
+                                            {#each team1Players as player}
+                                                {@const delta = getOverallDelta(game, player.player_id)}
+                                                {#if formatDelta(delta)}
+                                                    <p class={`text-[1.05rem] font-semibold tabular-nums ${deltaClass(delta)}`}>{formatDelta(delta)}</p>
+                                                {:else}
+                                                    <p class="text-[1.05rem] tabular-nums text-muted-foreground/40">—</p>
+                                                {/if}
+                                            {/each}
+                                        </div>
 
-                <Card.Header class="relative flex flex-row items-center justify-between gap-3 pb-1">
-                    <Badge variant="secondary" class="text-xs">{toLocal(game.game_timestamp)}</Badge>
-                    <span class="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Match n°{game.id}</span>
-                </Card.Header>
-
-                <Card.Content class="relative pt-3">
-                    <div class="grid grid-cols-1 items-stretch gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                        <div class="rounded-2xl border px-3 py-3 {teamPanelClass(t1Wins)}">
-                            <div class="mb-2 flex items-center justify-between">
-                                <span class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Equipe 1</span>
-                                {#if t1Wins}
-                                    <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">Vainqueur</span>
-                                {/if}
-                            </div>
-                            <div class="flex flex-wrap gap-2 md:justify-end">
-                                {#each t1 as m}
-                                    {@const mmrChange = getOverallChange(game, m.player_id)}
-                                    <div class="inline-flex min-w-[92px] flex-col items-end gap-1">
-                                        <a
-                                                href={statsHref(m.player_id)}
-                                                class="inline-flex max-w-full rounded-full px-3 py-1 text-sm font-medium transition hover:brightness-110 {playerChipClass(t1Wins)}"
-                                        >
-                                            <span class="truncate">{m.player.player_name ?? `P${m.player.id}`}</span>
-                                        </a>
-                                        {#if mmrChange}
-                                            <div class="text-[10px] leading-none inline-flex items-center gap-1.5">
-                                                <span class="text-muted-foreground">{formatElo(mmrChange.muAfter)}</span>
-                                                <span class="font-semibold {deltaClass(mmrChange.delta)}">
-                                                    {formatDelta(mmrChange.delta)}
-                                                </span>
+                                        <div class="min-w-[96px] text-center">
+                                            <div class="font-display text-[2rem] font-bold leading-none tabular-nums sm:text-[2.2rem]">
+                                                <span class={scoreClass(s1, s2)}>{s1}</span>
+                                                <span class="mx-1 text-muted-foreground">-</span>
+                                                <span class={scoreClass(s2, s1)}>{s2}</span>
                                             </div>
-                                        {/if}
+                                            <p class="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/80">Final score</p>
+                                        </div>
+
+                                        <div class="min-w-0 space-y-1.5">
+                                            <p class={`editorial-kicker ${outcomeClass(outcome2)}`}>{outcomeLabel(outcome2)}</p>
+                                            {#each team2Players as player}
+                                                <p class="truncate text-[1.05rem] font-semibold">{player.player.player_name ?? `P${player.player_id}`}</p>
+                                            {/each}
+                                        </div>
+
+                                        <div class="space-y-1.5 pt-5 text-right">
+                                            {#each team2Players as player}
+                                                {@const delta = getOverallDelta(game, player.player_id)}
+                                                {#if formatDelta(delta)}
+                                                    <p class={`text-[1.05rem] font-semibold tabular-nums ${deltaClass(delta)}`}>{formatDelta(delta)}</p>
+                                                {:else}
+                                                    <p class="text-[1.05rem] tabular-nums text-muted-foreground/40">—</p>
+                                                {/if}
+                                            {/each}
+                                        </div>
                                     </div>
-                                {/each}
-                            </div>
-                        </div>
+                                </div>
 
-                        <div class="rounded-2xl border border-border/60 bg-background/80 px-5 py-4 text-center shadow-inner">
-                            <div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Score final</div>
-                            <div class="mt-1 flex items-baseline justify-center gap-2">
-                                <span class="text-4xl font-black leading-none {t1Wins ? 'text-emerald-400' : 'text-foreground/90'}">{s1}</span>
-                                <span class="text-muted-foreground">–</span>
-                                <span class="text-4xl font-black leading-none {t2Wins ? 'text-emerald-400' : 'text-foreground/90'}">{s2}</span>
-                            </div>
-                        </div>
-
-                        <div class="rounded-2xl border px-3 py-3 {teamPanelClass(t2Wins)}">
-                            <div class="mb-2 flex items-center justify-between">
-                                <span class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Equipe 2</span>
-                                {#if t2Wins}
-                                    <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">Vainqueur</span>
-                                {/if}
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                {#each t2 as m}
-                                    {@const mmrChange = getOverallChange(game, m.player_id)}
-                                    <div class="inline-flex min-w-[92px] flex-col items-start gap-1">
-                                        <a
-                                                href={statsHref(m.player_id)}
-                                                class="inline-flex max-w-full rounded-full px-3 py-1 text-sm font-medium transition hover:brightness-110 {playerChipClass(t2Wins)}"
-                                        >
-                                            <span class="truncate">{m.player.player_name ?? `P${m.player.id}`}</span>
-                                        </a>
-                                        {#if mmrChange}
-                                            <div class="text-[10px] leading-none inline-flex items-center gap-1.5">
-                                                <span class="text-muted-foreground">{formatElo(mmrChange.muAfter)}</span>
-                                                <span class="font-semibold {deltaClass(mmrChange.delta)}">
-                                                    {formatDelta(mmrChange.delta)}
-                                                </span>
-                                            </div>
-                                        {/if}
+                                <div class="flex items-center justify-end gap-3">
+                                    <div class="text-right text-xs text-muted-foreground">
+                                        <p class="font-semibold text-foreground/80">{toTime(game.game_timestamp)}</p>
+                                        <p class="uppercase tracking-[0.08em]">Match #{game.id}</p>
                                     </div>
-                                {/each}
+
+                                    <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            class="rounded-full border border-primary/60 px-4 font-semibold text-primary shadow-none hover:bg-primary/10 hover:text-primary"
+                                            onclick={() => openEditModal(game)}
+                                            disabled={deletingId === game.id}
+                                    >
+                                        Editer
+                                    </Button>
+                                    <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            class="rounded-full border border-destructive/60 px-4 font-semibold text-destructive shadow-none hover:bg-destructive/10 hover:text-destructive"
+                                            onclick={() => handleDeleteMatch(game.id)}
+                                            disabled={deletingId === game.id}
+                                    >
+                                        {deletingId === game.id ? 'Suppression...' : 'Supprimer'}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </Card.Content>
-            </Card.Root>
-
+                    {/each}
+                </div>
+            </section>
         {/each}
-
-
     {/if}
 </div>
+
+{#if editingMatch}
+    <div class="fixed inset-0 z-50 grid place-items-center p-4">
+        <button
+                type="button"
+                class="absolute inset-0 bg-black/45 backdrop-blur-[1px]"
+                aria-label="Fermer la fenetre d'edition"
+                onclick={closeEditModal}
+        ></button>
+
+        <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-match-title"
+                class="relative w-full max-w-sm rounded-2xl border border-border bg-card p-4 shadow-[0_22px_50px_rgba(0,0,0,0.35)]"
+        >
+            <div class="mb-4 flex items-start justify-between gap-3">
+                <div>
+                    <h3 id="edit-match-title" class="text-base font-semibold">Editer le match #{editingMatch.id}</h3>
+                    <p class="text-xs text-muted-foreground">
+                        {dayLabel(editingMatch.game_timestamp)} a {toTime(editingMatch.game_timestamp)}
+                    </p>
+                </div>
+
+                <button
+                        type="button"
+                        class="rounded-lg p-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                        aria-label="Fermer"
+                        onclick={closeEditModal}
+                        disabled={savingEdit}
+                >
+                    ✕
+                </button>
+            </div>
+
+            <form class="space-y-4" onsubmit={handleSaveEdit}>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="space-y-1">
+                        <span class="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Equipe 1</span>
+                        <Input type="number" min="0" step="1" bind:value={editTeam1Score} required disabled={savingEdit}/>
+                    </label>
+                    <label class="space-y-1">
+                        <span class="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Equipe 2</span>
+                        <Input type="number" min="0" step="1" bind:value={editTeam2Score} required disabled={savingEdit}/>
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-end gap-2">
+                    <Button type="button" variant="ghost" onclick={closeEditModal} disabled={savingEdit}>
+                        Annuler
+                    </Button>
+                    <Button type="submit" disabled={savingEdit}>
+                        {savingEdit ? 'Enregistrement...' : 'Enregistrer'}
+                    </Button>
+                </div>
+            </form>
+        </div>
+    </div>
+{/if}
 
 <!-- Pagination -->
 {#if data.pageCount > 1}
@@ -306,3 +503,4 @@
     </div>
 {/if}
 <div class="h-6"></div>
+</div>

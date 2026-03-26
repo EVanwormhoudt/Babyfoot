@@ -54,6 +54,10 @@ export async function updateGame(id: number, data: any) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
     });
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `Impossible de modifier le match (${res.status})`);
+    }
     return res.json();
 }
 

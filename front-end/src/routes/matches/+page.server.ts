@@ -3,8 +3,10 @@ import {getGames} from '$lib/api/matches';
 
 export const load: PageServerLoad = async ({fetch, url}) => {
     const scope = (url.searchParams.get('scope') as 'all' | 'monthly') ?? 'all';
-    const limit = Number(url.searchParams.get('limit') ?? 10);
-    const page = Math.max(1, Number(url.searchParams.get('page') ?? 1));
+    const parsedLimit = Number(url.searchParams.get('limit'));
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 50) : 10;
+    const parsedPage = Number(url.searchParams.get('page'));
+    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? Math.floor(parsedPage) : 1;
     const offset = (page - 1) * limit;
     const start_date = url.searchParams.get('start_date') ?? undefined;
     const end_date = url.searchParams.get('end_date') ?? undefined;

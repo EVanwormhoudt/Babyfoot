@@ -5,7 +5,7 @@ import {getLeaderboard} from '$lib/api/players';
 export const ssr = false; // client-only to avoid eager SSR fetches
 
 type Scope = 'monthly' | 'yearly' | 'overall';
-type PlayerRow = { name: string; wins: number; losses: number; elo: number };
+type PlayerRow = { id: number; name: string; wins: number; losses: number; elo: number };
 
 const DEFAULT_SCOPE: Scope = 'yearly';
 
@@ -41,6 +41,7 @@ export const load: PageLoad = async ({fetch, url}) => {
             const muNum = Number(mu) || 0;
             const sigmaNum = Number(sigma) || 0;
             return {
+                id: Number(p.id) || 0,
                 name: p.player_name ?? p.name ?? 'Inconnu',
                 wins: p.wins,
                 losses: p.games_played - p.wins,

@@ -1,8 +1,10 @@
 <script lang="ts">
     import {goto} from '$app/navigation';
+    import {onMount} from 'svelte';
     import {Card, CardContent, CardHeader, CardTitle} from '$lib/components/ui/card';
     import type {PlayerRatingHistoryPoint, Scope} from '$lib/api/players';
     import type {PageData} from './$types';
+    import {getStoredCurrentPlayerId, setStoredCurrentPlayerId} from '$lib/current-player';
 
     type ChartPoint = {
         x: number;
@@ -86,6 +88,11 @@
     });
 
     function applyFilters() {
+        const playerIdNum = Number(selectedPlayerId);
+        if (Number.isFinite(playerIdNum) && playerIdNum > 0) {
+            setStoredCurrentPlayerId(playerIdNum);
+        }
+
         const params = new URLSearchParams();
         if (selectedPlayerId) params.set('player_id', selectedPlayerId);
         params.set('scope', selectedScope);
@@ -98,6 +105,18 @@
 
         goto(`?${params.toString()}`, {replaceState: true, noScroll: true});
     }
+
+    onMount(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('player_id')) return;
+
+        const storedId = getStoredCurrentPlayerId();
+        if (!storedId) return;
+        if (!data.players.some((player: { id: number }) => player.id === storedId)) return;
+
+        selectedPlayerId = String(storedId);
+        applyFilters();
+    });
 
     function percent(value: number) {
         return `${(value * 100).toFixed(1)}%`;
@@ -362,7 +381,7 @@
 
         {#if data.statsError}
             <Card>
-                <CardContent class="py-6 text-sm text-red-500">
+                <CardContent class="py-6 text-sm text-destructive">
                     {data.statsError}
                 </CardContent>
             </Card>
@@ -422,7 +441,7 @@
 
         {#if data.ratingHistoryError}
             <Card>
-                <CardContent class="py-6 text-sm text-red-500">
+                <CardContent class="py-6 text-sm text-destructive">
                     {data.ratingHistoryError}
                 </CardContent>
             </Card>
@@ -436,13 +455,13 @@
                 </CardContent>
             </Card>
         {:else}
-            <Card class="border-emerald-500/20 bg-gradient-to-b from-emerald-950/20 to-background">
+            <Card class="bg-[hsl(var(--surface-container-low))]">
                 <CardHeader class="flex flex-row items-start justify-between gap-4">
                     <div class="space-y-1">
                         <CardTitle>Historique Elo de {selectedPlayerName} ({selectedScopeLabel})</CardTitle>
                         <p class="text-xs text-muted-foreground">Evolution de l'Elo sur les snapshots enregistres</p>
                     </div>
-                    <div class="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
+                    <div class="tone-accent-soft rounded-full px-3 py-1 text-xs font-medium">
                         {pointCount} points
                     </div>
                 </CardHeader>
@@ -557,19 +576,19 @@
                                         stroke-width="1.5"
                                         opacity="0.97"
                                 />
-                                <text x="12" y="20" fill="#a7f3d0" class="text-[11px] font-semibold">
+                                <text x="12" y="20" fill="hsl(var(--foreground))" class="text-[11px] font-semibold">
                                     {hoveredPoint.dateLabel}
                                 </text>
-                                <text x="12" y="38" fill="#d1fae5" class="text-[11px]">
+                                <text x="12" y="38" fill="hsl(var(--muted-foreground))" class="text-[11px]">
                                     Valeur : {muAmount(hoveredPoint.mu)}
                                 </text>
-                                <text x="12" y="54" fill="#d1fae5" class="text-[11px]">
+                                <text x="12" y="54" fill="hsl(var(--muted-foreground))" class="text-[11px]">
                                     Rang : {hoveredPoint.rank} ({scopeToLabel(hoveredPoint.rankType)})
                                 </text>
-                                <text x="12" y="70" fill="#d1fae5" class="text-[11px]">
+                                <text x="12" y="70" fill="hsl(var(--muted-foreground))" class="text-[11px]">
                                     Sigma: {hoveredPoint.sigma === null ? '—' : hoveredPoint.sigma.toFixed(1)}
                                 </text>
-                                <text x="12" y="86" fill="#d1fae5" class="text-[11px]">
+                                <text x="12" y="86" fill="hsl(var(--muted-foreground))" class="text-[11px]">
                                     Δ precedent : {hoveredDelta === null ? '—' : signed(hoveredDelta)}
                                 </text>
                             </g>
@@ -589,22 +608,22 @@
                             <div class="text-muted-foreground">Elo maximum</div>
                             <div class="mt-1 font-semibold">{muAmount(chart.maxMu)}</div>
                         </div>
-                        <div class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2">
-                            <div class="text-emerald-200/80">Actuel</div>
-                            <div class="mt-1 font-semibold text-emerald-300">{muAmount(chart.latestMu)}</div>
+                        <div class="tone-accent-soft rounded-lg p-2">
+                            <div>Actuel</div>
+                            <div class="mt-1 font-semibold">{muAmount(chart.latestMu)}</div>
                         </div>
-                        <div class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2">
-                            <div class="text-emerald-200/80">Tendance</div>
-                            <div class="mt-1 font-semibold {trendDelta >= 0 ? 'text-emerald-300' : 'text-rose-300'}">
+                        <div class="tone-accent-soft rounded-lg p-2">
+                            <div>Tendance</div>
+                            <div class="mt-1 font-semibold {trendDelta >= 0 ? 'tone-positive' : 'tone-negative'}">
                                 {signed(trendDelta)}
                             </div>
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                         {#each recentHistory as point}
-                            <div class="rounded-lg border border-emerald-500/25 bg-emerald-950/15 px-2.5 py-2 text-xs">
+                            <div class="tone-accent-soft rounded-lg px-2.5 py-2 text-xs">
                                 <div class="text-muted-foreground">{point.dateLabel}</div>
-                                <div class="mt-0.5 font-semibold text-emerald-300">{muAmount(point.mu)}</div>
+                                <div class="mt-0.5 font-semibold">{muAmount(point.mu)}</div>
                             </div>
                         {/each}
                     </div>
