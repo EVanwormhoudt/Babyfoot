@@ -169,7 +169,14 @@
             .filter((point): point is PlayerRatingHistoryPoint & { mu: number } => point.mu !== null)
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-        if (sorted.length === 0) {
+        const baselineMu = 1000;
+        const firstNonBaselineIndex = sorted.findIndex((point) => Math.abs(point.mu - baselineMu) > 0.0001);
+        const visible =
+            firstNonBaselineIndex > 0
+                ? sorted.slice(firstNonBaselineIndex)
+                : sorted;
+
+        if (visible.length === 0) {
             return {
                 width,
                 height,
@@ -191,8 +198,8 @@
             };
         }
 
-        const muValues = sorted.map((point) => point.mu);
-        const dateValues = sorted.map((point) => new Date(point.date).getTime());
+        const muValues = visible.map((point) => point.mu);
+        const dateValues = visible.map((point) => new Date(point.date).getTime());
         const minMu = Math.min(...muValues);
         const maxMu = Math.max(...muValues);
         const axisStep = 100;
@@ -210,7 +217,7 @@
         const plotWidth = width - left - right;
         const plotHeight = height - top - bottom;
 
-        const points: ChartPoint[] = sorted.map((point, index) => {
+        const points: ChartPoint[] = visible.map((point, index) => {
             const x = left + ((dateValues[index] - minDate) / dateSpan) * plotWidth;
             const y = top + (1 - ((point.mu - axisMin) / axisSpan)) * plotHeight;
             return {
@@ -241,12 +248,12 @@
             });
         }
 
-        const xTicks: AxisXTick[] = sorted.length === 1
+        const xTicks: AxisXTick[] = visible.length === 1
             ? [{x: points[0].x, label: points[0].dateLabel}]
             : [
-                {x: left, label: formatDate(sorted[0].date)},
+                {x: left, label: formatDate(visible[0].date)},
                 {x: left + plotWidth / 2, label: formatTimestamp(minDate + dateSpan / 2)},
-                {x: left + plotWidth, label: formatDate(sorted[sorted.length - 1].date)}
+                {x: left + plotWidth, label: formatDate(visible[visible.length - 1].date)}
             ];
 
         return {
@@ -260,8 +267,8 @@
             minMu,
             maxMu,
             latestMu: points[points.length - 1].mu,
-            startDate: formatDate(sorted[0].date),
-            endDate: formatDate(sorted[sorted.length - 1].date),
+            startDate: formatDate(visible[0].date),
+            endDate: formatDate(visible[visible.length - 1].date),
             leftX: left,
             rightX: width - right,
             topY: top,

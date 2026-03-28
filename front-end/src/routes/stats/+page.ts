@@ -49,14 +49,14 @@ export const load: PageLoad = async ({fetch, url}) => {
     let ratingHistoryError: string | null = null;
 
     if (selectedPlayerId !== null) {
-        const statsOpts =
+        const periodOpts =
             scope === 'monthly' ? {year: selectedYear, month: selectedMonth}
                 : scope === 'yearly' ? {year: selectedYear}
                     : {};
 
         const [statsResult, historyResult] = await Promise.allSettled([
-            getPlayerStats(selectedPlayerId, scope, statsOpts, fetch),
-            getPlayerRatingHistory(selectedPlayerId, scope, fetch)
+            getPlayerStats(selectedPlayerId, scope, periodOpts, fetch),
+            getPlayerRatingHistory(selectedPlayerId, scope, periodOpts, fetch)
         ]);
 
         if (statsResult.status === 'fulfilled') {

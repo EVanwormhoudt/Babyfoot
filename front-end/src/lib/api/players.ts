@@ -115,12 +115,23 @@ export async function getPlayerHistory(id: number, eventFetch?: F) {
 export async function getPlayerRatingHistory(
     id: number,
     ratingType?: Scope,
-    eventFetch?: F
+    optsOrFetch?: StatsOpts | F,
+    maybeFetch?: F
 ) {
-    const f = eventFetch ?? fetch;
+    const opts: StatsOpts =
+        typeof optsOrFetch === 'function' ? {} : (optsOrFetch ?? {});
+    const f: F =
+        typeof optsOrFetch === 'function' ? (optsOrFetch as F) : (maybeFetch ?? fetch);
+
     const params = new URLSearchParams();
     if (ratingType) {
         params.set('rating_type', ratingType);
+    }
+    if (ratingType && ratingType !== 'overall' && typeof opts.year === 'number' && Number.isFinite(opts.year)) {
+        params.set('year', String(opts.year));
+    }
+    if (ratingType === 'monthly' && typeof opts.month === 'number' && opts.month >= 1 && opts.month <= 12) {
+        params.set('month', String(opts.month));
     }
     const query = params.toString();
     const url = query

@@ -232,18 +232,45 @@ def get_player_rating_history(
             None,
             description="Optional filter for rating snapshot type",
         ),
+        year: Optional[int] = Query(
+            None,
+            description="Year to filter by (used for monthly/yearly). Defaults to current year.",
+        ),
+        month: Optional[int] = Query(
+            None,
+            ge=1,
+            le=12,
+            description="Month (1..12). Used only for monthly. Defaults to current month.",
+        ),
         session: Session = Depends(get_session),
 ):
     if not session.get(Player, player_id):
         raise HTTPException(404, "Joueur introuvable")
+
+    if rating_type is None and (year is not None or month is not None):
+        raise HTTPException(422, "year/month sont supportes uniquement quand rating_type est defini")
+    if rating_type != "monthly" and month is not None:
+        raise HTTPException(422, "month est supporte uniquement quand rating_type=monthly")
+    if rating_type == "overall" and year is not None:
+        raise HTTPException(422, "year n'est pas supporte quand rating_type=overall")
 
     stmt = (
         select(PlayerRatingHistory)
         .where(PlayerRatingHistory.player_id == player_id)
         .order_by(PlayerRatingHistory.date.asc(), PlayerRatingHistory.update_id.asc())
     )
+
     if rating_type is not None:
         stmt = stmt.where(PlayerRatingHistory.rank_type == rating_type)
+        if rating_type in ("monthly", "yearly"):
+            try:
+                start_dt, end_dt = period_bounds(rating_type, year=year, month=month)
+            except ValueError as e:
+                raise HTTPException(422, str(e))
+            stmt = stmt.where(
+                PlayerRatingHistory.date >= start_dt.date(),
+                PlayerRatingHistory.date < end_dt.date(),
+            )
 
     return session.exec(stmt).all()
 
