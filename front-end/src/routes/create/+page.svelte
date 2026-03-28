@@ -8,6 +8,8 @@
     import {PUBLIC_API_BASE} from "$env/static/public";
     import {toast} from "svelte-sonner";
     import * as Card from "$lib/components/ui/card/index.js";
+    import ArrowLeftRight from "@lucide/svelte/icons/arrow-left-right";
+    import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
     import {getStoredCurrentPlayerId, onCurrentPlayerChange} from '$lib/current-player';
 
     type PlayerLite = {
@@ -48,22 +50,26 @@
         return currentPlayerId !== null && item.id === currentPlayerId;
     }
 
+    type MatchColumn = { id: number; name: string; class: string; items: DndItem[] };
+
+    function buildInitialColumns(): MatchColumn[] {
+        return [
+            {
+                id: COL_PLAYERS,
+                name: "Joueurs disponibles",
+                class: "players",
+                items: playersLite
+                    .filter((p) => p.active)
+                    .map(normalizeItem)
+                    .sort(sortByName)
+            },
+            {id: COL_RED, name: "Equipe rouge", class: "team-red", items: []},
+            {id: COL_BLUE, name: "Equipe bleue", class: "team-blue", items: []}
+        ];
+    }
+
     // DnD columns use $state so nested mutations are reactive
-    let columnItems = $state<
-        { id: number; name: string; class: string; items: DndItem[] }[]
-    >([
-        {
-            id: COL_PLAYERS,
-            name: "Joueurs disponibles",
-            class: "players",
-            items: playersLite
-                .filter((p) => p.active)
-                .map(normalizeItem)
-                .sort(sortByName)
-        },
-        { id: COL_RED, name: "Equipe rouge", class: "team-red", items: [] },
-        { id: COL_BLUE, name: "Equipe bleue", class: "team-blue", items: [] }
-    ]);
+    let columnItems = $state<MatchColumn[]>(buildInitialColumns());
 
     const availablePool = $derived(columnItems.find((c) => c.id === COL_PLAYERS));
     const availableItems = $derived(availablePool?.items ?? []);
@@ -205,6 +211,34 @@
         }
     }
 
+    function resetMatchSetup() {
+        columnItems = buildInitialColumns();
+        redScore = '';
+        blueScore = '';
+    }
+
+    function swapSides() {
+        const redCol = columnItems.find((column) => column.id === COL_RED);
+        const blueCol = columnItems.find((column) => column.id === COL_BLUE);
+        if (!redCol || !blueCol) return;
+
+        const nextRedItems = [...blueCol.items];
+        const nextBlueItems = [...redCol.items];
+
+        columnItems = columnItems.map((column) => {
+            if (column.id === COL_RED) {
+                return {...column, items: nextRedItems};
+            }
+            if (column.id === COL_BLUE) {
+                return {...column, items: nextBlueItems};
+            }
+            return column;
+        });
+
+        const oldRedScore = redScore;
+        redScore = blueScore;
+        blueScore = oldRedScore;
+    }
 
     async function submitScore() {
         const r = typeof redScore === 'number' ? redScore : Number(redScore);
@@ -433,6 +467,30 @@
                 <Button class="h-11 min-w-[170px] rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onclick={submitScore} disabled={submitting}>
                     {submitting ? 'Envoi...' : 'Envoyer le score'}
                 </Button>
+                <div class="flex items-center gap-2">
+                    <Button
+                            size="icon"
+                            class="h-11 w-11 rounded-xl"
+                            variant="secondary"
+                            onclick={swapSides}
+                            disabled={submitting}
+                            title="Inverser les cotes"
+                            aria-label="Inverser les cotes"
+                    >
+                        <ArrowLeftRight />
+                    </Button>
+                    <Button
+                            size="icon"
+                            class="h-11 w-11 rounded-xl"
+                            variant="outline"
+                            onclick={resetMatchSetup}
+                            disabled={submitting}
+                            title="Reinitialiser les equipes et les scores"
+                            aria-label="Reinitialiser les equipes et les scores"
+                    >
+                        <RotateCcw />
+                    </Button>
+                </div>
             </Card.Footer>
         </Card.Root>
 
