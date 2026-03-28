@@ -1,4 +1,4 @@
-<script lang="ts">
+    <script lang="ts">
     import '../app.css';
     import {ModeWatcher, mode, toggleMode} from "mode-watcher";
     import {onDestroy, onMount} from "svelte";
@@ -7,6 +7,7 @@
     import {Toaster} from "$lib/components/ui/sonner";
     import {page} from '$app/state';
     import {getStoredCurrentPlayerId, setStoredCurrentPlayerId} from '$lib/current-player';
+    import {base} from '$app/paths';
 
     type HeaderPlayer = {
         id: number;
@@ -33,12 +34,17 @@
             .sort((a: HeaderPlayer, b: HeaderPlayer) => a.player_name.localeCompare(b.player_name, undefined, {sensitivity: 'base'}))
     );
     let mePlayerId = $state('');
+    let pendingWhoAmI = $state('');
+    let showWhoAmIModal = $state(false);
     const mePlayer = $derived(
         selectablePlayers.find((player: HeaderPlayer) => String(player.id) === mePlayerId)
     );
     const statsHref = $derived(
         mePlayerId ? `/stats?player_id=${mePlayerId}` : '/stats'
     );
+    const lightFaviconHref = `${base}/foosball_light.png`;
+    const darkFaviconHref = `${base}/foosball.png`;
+    let faviconObserver: MutationObserver | null = null;
 
 
     function isActive(href: string) {
@@ -62,6 +68,27 @@
         const parsed = Number(mePlayerId);
         if (!Number.isFinite(parsed) || parsed <= 0) return;
         setStoredCurrentPlayerId(parsed);
+        pendingWhoAmI = mePlayerId;
+    }
+
+    function confirmWhoAmISelection() {
+        const parsed = Number(pendingWhoAmI);
+        if (!Number.isFinite(parsed) || parsed <= 0) return;
+        mePlayerId = String(parsed);
+        setStoredCurrentPlayerId(parsed);
+        showWhoAmIModal = false;
+    }
+
+    function syncFaviconWithTheme() {
+        if (typeof document === 'undefined') return;
+        const favicon = document.getElementById('app-favicon') as HTMLLinkElement | null;
+        if (!favicon) return;
+
+        const isDark = document.documentElement.classList.contains('dark');
+        const targetHref = isDark ? darkFaviconHref : lightFaviconHref;
+        if (favicon.getAttribute('href') !== targetHref) {
+            favicon.setAttribute('href', targetHref);
+        }
     }
 
     onMount(() => {
@@ -71,11 +98,25 @@
 
         if (storedString && selectablePlayers.some((player: HeaderPlayer) => String(player.id) === storedString)) {
             mePlayerId = storedString;
+            pendingWhoAmI = storedString;
+            showWhoAmIModal = false;
             return;
         }
 
-        mePlayerId = String(selectablePlayers[0].id);
-        onMeChange();
+        mePlayerId = '';
+        pendingWhoAmI = '';
+        showWhoAmIModal = true;
+    });
+
+    onMount(() => {
+        syncFaviconWithTheme();
+        faviconObserver = new MutationObserver(() => {
+            syncFaviconWithTheme();
+        });
+        faviconObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
     });
 
     let themeTransitionTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -89,6 +130,7 @@
         const root = document.documentElement;
         root.classList.add('theme-switching');
         toggleMode();
+        requestAnimationFrame(() => syncFaviconWithTheme());
 
         if (themeTransitionTimeout) {
             clearTimeout(themeTransitionTimeout);
@@ -103,6 +145,10 @@
     onDestroy(() => {
         if (themeTransitionTimeout) {
             clearTimeout(themeTransitionTimeout);
+        }
+        if (faviconObserver) {
+            faviconObserver.disconnect();
+            faviconObserver = null;
         }
     });
 </script>
@@ -143,6 +189,7 @@
                                 class="h-7 rounded-lg border border-border/70 bg-background px-2 text-xs text-foreground"
                                 onchange={onMeChange}
                         >
+                            <option value="" disabled>Selectionner</option>
                             {#each selectablePlayers as player}
                                 <option value={String(player.id)}>{player.player_name}</option>
                             {/each}
@@ -166,6 +213,39 @@
         </nav>
     </div>
 </header>
+
+{#if showWhoAmIModal && selectablePlayers.length > 0}
+    <div class="fixed inset-0 z-[120] bg-background/70 backdrop-blur-sm">
+        <div class="mx-auto mt-[12vh] w-[min(92vw,420px)] rounded-2xl border border-border/90 bg-card p-5 shadow-[0_18px_40px_rgba(15,23,42,0.22)]">
+            <h2 class="font-display text-2xl font-bold text-foreground">Qui es-tu ?</h2>
+            <p class="mt-1 text-sm text-muted-foreground">
+                Selection obligatoire au premier lancement pour personnaliser tes stats.
+            </p>
+
+            <label class="mt-4 flex flex-col gap-2">
+                <span class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Joueur</span>
+                <select
+                        bind:value={pendingWhoAmI}
+                        class="h-10 rounded-xl border border-border/85 bg-background px-3 text-sm text-foreground"
+                >
+                    <option value="" disabled>Choisis ton nom</option>
+                    {#each selectablePlayers as player}
+                        <option value={String(player.id)}>{player.player_name}</option>
+                    {/each}
+                </select>
+            </label>
+
+            <button
+                    type="button"
+                    class="mt-5 inline-flex h-10 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    onclick={confirmWhoAmISelection}
+                    disabled={!pendingWhoAmI}
+            >
+                Continuer
+            </button>
+        </div>
+    </div>
+{/if}
 
 <main class="w-full">
     {@render children()}
