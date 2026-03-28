@@ -26,6 +26,13 @@ from ..settings import settings
 router = APIRouter()
 
 
+def _validate_score_bounds(score_team1: int, score_team2: int) -> None:
+    if score_team1 < 0 or score_team2 < 0:
+        raise HTTPException(422, "Les scores doivent etre positifs ou nuls")
+    if score_team1 > 10 or score_team2 > 10:
+        raise HTTPException(422, "Les scores doivent etre compris entre 0 et 10")
+
+
 @router.get("", response_model=GamesList)
 def get_games(
         session: Session = Depends(get_session),
@@ -75,8 +82,7 @@ def get_games(
 
 
 def _validate_game_payload(payload: GameCreate, session: Session) -> Dict[int, Player]:
-    if payload.result_team1 < 0 or payload.result_team2 < 0:
-        raise HTTPException(422, "Les scores doivent etre positifs ou nuls")
+    _validate_score_bounds(payload.result_team1, payload.result_team2)
     if any(t.team_number not in (1, 2) for t in payload.teams):
         raise HTTPException(422, "team_number doit valoir 1 ou 2")
     if not payload.teams:
@@ -173,8 +179,7 @@ def update_game(game_id: int, payload: GameUpdate, session: Session = Depends(ge
     g = session.get(Game, game_id)
     if not g:
         raise HTTPException(404, "Match introuvable")
-    if payload.result_team1 < 0 or payload.result_team2 < 0:
-        raise HTTPException(422, "Les scores doivent etre positifs ou nuls")
+    _validate_score_bounds(payload.result_team1, payload.result_team2)
 
     try:
         g.result_team1 = payload.result_team1

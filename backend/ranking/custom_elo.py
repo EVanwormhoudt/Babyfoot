@@ -84,7 +84,7 @@ def update_all_ratings(
         c_effect: float = 2.0,        # how much σ reduces effective strength
         K_sigma: float = 6.0,         # sigma update strength (small)
         sigma_min: float = 45.0,
-        sigma_max: float = 220.0,
+        sigma_max: float = float(DEFAULT_SIGMA),
         timestamp_tz: _dt.tzinfo = _dt.timezone.utc,
         # Optional per-player weights (e.g., minutes played): {player_id: weight}
         weights: Optional[Dict[int, float]] = None,
@@ -101,7 +101,7 @@ def update_all_ratings(
       5) σ updates are gentle, also scaled by a smaller margin multiplier.
 
     Notes:
-      - Uses game.K if present; else defaults to 8.
+      - Uses game.K if present; else defaults to 16.
       - Works whether rating exposes get_mu()/set_mu() or mu_<type> attributes.
     """
     if rating_types is None:
@@ -121,8 +121,8 @@ def update_all_ratings(
     else:
         s1 = s2 = 0.5
 
-    # Margin multipliers (bounded & linear over 0..10)
-    margin = abs(int(game.result_team1) - int(game.result_team2))  # 0..10
+    # Margin multipliers (linear over 0..10, clamped to 10)
+    margin = min(10, abs(int(game.result_team1) - int(game.result_team2)))
     margin_ratio = margin / 10.0
     M_mu = 1.0 + (mu_margin_top - 1.0) * margin_ratio
     M_sigma = 1.0 + (sigma_margin_top - 1.0) * margin_ratio
@@ -130,23 +130,13 @@ def update_all_ratings(
     # Base K for μ
     K = getattr(game, "K", 16)
 
-    # Timestamp: prefer game date/time if provided
+    # Timestamp: prefer game timestamp if provided
     def _safe_ts() -> _dt.datetime:
-        gd = getattr(game, "game_date", None)
-        gt = getattr(game, "game_time", None)
-        if gd and gt:
-            if isinstance(gt, str):
-                try:
-                    hh, mm = map(int, gt.split(":")[:2])
-                    t = _dt.time(hour=hh, minute=mm, tzinfo=timestamp_tz)
-                except Exception:
-                    t = _dt.time(tzinfo=timestamp_tz)
-            elif isinstance(gt, _dt.time):
-                t = gt.replace(tzinfo=timestamp_tz)
-            else:
-                t = _dt.time(tzinfo=timestamp_tz)
-            if isinstance(gd, _dt.date) and not isinstance(gd, _dt.datetime):
-                return _dt.datetime.combine(gd, t)
+        gts = getattr(game, "game_timestamp", None)
+        if isinstance(gts, _dt.datetime):
+            if gts.tzinfo is None:
+                return gts.replace(tzinfo=timestamp_tz)
+            return gts.astimezone(timestamp_tz)
         return _dt.datetime.now(timestamp_tz)
 
     ts = _safe_ts()
