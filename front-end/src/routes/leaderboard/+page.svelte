@@ -66,6 +66,7 @@
     const rankedPlayers = $derived(
         data.players.map((player: { id: number; name: string; wins: number; losses: number; elo: number }, idx: number) => ({...player, rank: idx + 1}))
     );
+    const podiumOrder = [2, 1, 3] as const;
     let currentPlayerId = $state<number | null>(null);
 
     function isCurrentPlayer(player: { id: number }) {
@@ -133,15 +134,25 @@
                 Every flick, block, and goal is recorded. Classement live de la ligue interne.
             </p>
         </div>
-        <div class="grid grid-cols-3 gap-2">
-            {#each rankedPlayers.slice(0, 3) as row}
-                <div class={`rounded-2xl bg-card px-3 py-3 text-center shadow-[0_20px_40px_rgba(12,15,16,0.06)] ${isCurrentPlayer(row) ? 'ring-2 ring-primary/40' : ''}`}>
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">#{String(row.rank).padStart(2, '0')}</p>
-                    <p class="mt-1 truncate text-sm font-semibold">{row.name}</p>
-                    {#if isCurrentPlayer(row)}
-                        <p class="mt-1 text-[10px] font-semibold uppercase tracking-[0.13em] tone-positive">Vous</p>
-                    {/if}
-                    <p class="mt-2 font-display text-2xl font-bold text-primary">{row.elo}</p>
+        <div class="surface-low grid grid-cols-3 items-end gap-2 rounded-2xl p-2">
+            {#each podiumOrder as podiumRank}
+                {@const row = rankedPlayers.find((player: { rank }) => player.rank === podiumRank)}
+                <div class="flex flex-col">
+                    <div class={`rounded-t-2xl border border-border/75 bg-card px-2 text-center shadow-[0_14px_24px_rgba(12,15,16,0.06)] ${podiumRank === 1 ? 'min-h-[116px] py-3' : 'min-h-[96px] py-2'} ${row && isCurrentPlayer(row) ? 'ring-2 ring-primary/40' : ''}`}>
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">#{String(podiumRank).padStart(2, '0')}</p>
+                        {#if row}
+                            <p class="mt-1 truncate text-sm font-semibold">{row.name}</p>
+                            {#if isCurrentPlayer(row)}
+                                <p class="mt-1 text-[10px] font-semibold uppercase tracking-[0.13em] tone-positive">Vous</p>
+                            {/if}
+                            <p class="mt-2 font-display text-2xl font-bold text-primary">{row.elo}</p>
+                        {:else}
+                            <p class="mt-5 text-xs text-muted-foreground">Aucun joueur</p>
+                        {/if}
+                    </div>
+                    <div class={`flex items-center justify-center rounded-b-2xl border border-t-0 border-border/75 text-sm font-semibold uppercase tracking-[0.15em] ${podiumRank === 1 ? 'h-20 bg-primary/14 text-primary' : podiumRank === 2 ? 'h-14 bg-secondary/80 text-secondary-foreground' : 'h-12 bg-secondary/65 text-secondary-foreground'}`}>
+                        {podiumRank === 1 ? '1st' : podiumRank === 2 ? '2nd' : '3rd'}
+                    </div>
                 </div>
             {/each}
         </div>
