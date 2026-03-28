@@ -5,12 +5,15 @@
     import * as Table from "$lib/components/ui/table/index.js";
     import {getStoredCurrentPlayerId, onCurrentPlayerChange} from "$lib/current-player";
 
+    type LeaderboardPlayer = { id: number; name: string; wins: number; losses: number; elo: number };
+    type RankedPlayer = LeaderboardPlayer & { rank: number };
+
     let {data} = $props<{
         data: {
             scope: "monthly" | "yearly" | "overall";
             year: number;
             month?: number;
-            players: { id: number; name: string; wins: number; losses: number; elo: number }[];
+            players: LeaderboardPlayer[];
         };
     }>();
 
@@ -63,8 +66,8 @@
         "z-50 min-w-[--bits-select-trigger-width] rounded-xl bg-popover p-1 shadow-xl";
     const itemClass =
         "cursor-pointer select-none rounded-lg px-3 py-2 text-sm text-foreground hover:bg-secondary data-[state=checked]:bg-primary/15 data-[state=checked]:text-primary";
-    const rankedPlayers = $derived(
-        data.players.map((player: { id: number; name: string; wins: number; losses: number; elo: number }, idx: number) => ({...player, rank: idx + 1}))
+    const rankedPlayers = $derived<RankedPlayer[]>(
+        data.players.map((player: LeaderboardPlayer, idx: number) => ({...player, rank: idx + 1}))
     );
     const podiumOrder = [2, 1, 3] as const;
     let currentPlayerId = $state<number | null>(null);
@@ -136,7 +139,7 @@
         </div>
         <div class="surface-low grid grid-cols-3 items-end gap-2 rounded-2xl p-2">
             {#each podiumOrder as podiumRank}
-                {@const row = rankedPlayers.find((player: { rank }) => player.rank === podiumRank)}
+                {@const row = rankedPlayers.find((player) => player.rank === podiumRank)}
                 <div class="flex flex-col">
                     <div class={`rounded-t-2xl border border-border/75 bg-card px-2 text-center shadow-[0_14px_24px_rgba(12,15,16,0.06)] ${podiumRank === 1 ? 'min-h-[116px] py-3' : 'min-h-[96px] py-2'} ${row && isCurrentPlayer(row) ? 'ring-2 ring-primary/40' : ''}`}>
                         <p class="text-[10px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">#{String(podiumRank).padStart(2, '0')}</p>
