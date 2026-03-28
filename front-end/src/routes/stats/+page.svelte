@@ -289,6 +289,45 @@
     );
     const recentHistory = $derived(chart.points.slice(-5));
     const pointCount = $derived(chart.points.length);
+    function handleChartPointerMove(event: PointerEvent) {
+        const svg = event.currentTarget as SVGSVGElement | null;
+        if (!svg || chart.points.length === 0) {
+            hoveredPointIndex = null;
+            return;
+        }
+
+        const screenPoint = svg.createSVGPoint();
+        screenPoint.x = event.clientX;
+        screenPoint.y = event.clientY;
+
+        const ctm = svg.getScreenCTM();
+        if (!ctm) {
+            hoveredPointIndex = null;
+            return;
+        }
+
+        const localPoint = screenPoint.matrixTransform(ctm.inverse());
+        if (
+            localPoint.x < chart.leftX ||
+            localPoint.x > chart.rightX ||
+            localPoint.y < chart.topY ||
+            localPoint.y > chart.bottomY
+        ) {
+            hoveredPointIndex = null;
+            return;
+        }
+
+        let bestIndex = 0;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        for (let index = 0; index < chart.points.length; index += 1) {
+            const distance = Math.abs(chart.points[index].x - localPoint.x);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = index;
+            }
+        }
+        hoveredPointIndex = bestIndex;
+    }
     const hoveredPoint = $derived(
         hoveredPointIndex !== null && hoveredPointIndex >= 0 && hoveredPointIndex < chart.points.length
             ? chart.points[hoveredPointIndex]
@@ -479,6 +518,7 @@
                             preserveAspectRatio="xMinYMin meet"
                             role="img"
                             aria-label={`Graphique d'historique Elo de ${selectedPlayerName}`}
+                            onpointermove={handleChartPointerMove}
                             onpointerleave={() => (hoveredPointIndex = null)}
                     >
                         <defs>
@@ -538,17 +578,6 @@
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
                         />
-                        {#each chart.points as point, index}
-                            <circle
-                                    cx={point.x}
-                                    cy={point.y}
-                                    r={index === chart.points.length - 1 ? 5 : 3.5}
-                                    fill={index === chart.points.length - 1 ? chartStrokeStrong : chartStroke}
-                                    onpointerenter={() => (hoveredPointIndex = index)}
-                            >
-                                <title>{`${point.dateLabel}: ${muAmount(point.mu)}`}</title>
-                            </circle>
-                        {/each}
                         {#if hoveredPoint}
                             <line
                                     x1={hoveredPoint.x}
