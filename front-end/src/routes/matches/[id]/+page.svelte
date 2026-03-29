@@ -26,8 +26,8 @@
 
     function teamOutcome(teamNumber: 1 | 2) {
         const winner = winnerTeam();
-        if (winner === 0) return 'Draw';
-        return winner === teamNumber ? 'Winner' : 'Defeated';
+        if (winner === 0) return 'Nul';
+        return winner === teamNumber ? 'Victoire' : 'Défaite';
     }
 
     function outcomeClass(teamNumber: 1 | 2) {
@@ -85,7 +85,7 @@
     <Card class="rounded-3xl bg-[hsl(var(--surface-container-low))]">
         <CardHeader class="space-y-2">
             <p class="editorial-kicker">Match #{game.id}</p>
-            <CardTitle class="font-display text-3xl font-bold uppercase tracking-tight">Details du match</CardTitle>
+            <CardTitle class="font-display text-3xl font-bold uppercase tracking-tight">Détails du match</CardTitle>
             <p class="text-sm text-muted-foreground">
                 {formatDate(game.game_timestamp)} a {formatTime(game.game_timestamp)}
             </p>
@@ -115,9 +115,9 @@
                     <tr>
                         <th class="px-4 py-3 font-semibold">Joueur</th>
                         <th class="px-4 py-3 font-semibold">Equipe</th>
-                        <th class="px-4 py-3 font-semibold">Overall</th>
-                        <th class="px-4 py-3 font-semibold">Monthly</th>
-                        <th class="px-4 py-3 font-semibold">Yearly</th>
+                        <th class="px-4 py-3 font-semibold">General</th>
+                        <th class="px-4 py-3 font-semibold">Mensuel</th>
+                        <th class="px-4 py-3 font-semibold">Annuel</th>
                     </tr>
                     </thead>
                     <tbody>

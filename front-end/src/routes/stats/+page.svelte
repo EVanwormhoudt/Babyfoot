@@ -84,7 +84,7 @@
         if (selectedScope === 'yearly') {
             return selectedYear;
         }
-        return 'Global';
+        return 'General';
     });
 
     function applyFilters() {
@@ -134,7 +134,7 @@
     function scopeToLabel(scope: Scope): string {
         if (scope === 'monthly') return 'Mensuel';
         if (scope === 'yearly') return 'Annuel';
-        return 'Global';
+        return 'General';
     }
 
     function formatDate(value: string): string {
@@ -388,7 +388,7 @@
                         class="h-10 rounded-md border bg-background px-3 text-sm"
                         onchange={applyFilters}
                 >
-                    <option value="overall">Global</option>
+                    <option value="overall">General</option>
                     <option value="monthly">Mensuel</option>
                     <option value="yearly">Annuel</option>
                 </select>

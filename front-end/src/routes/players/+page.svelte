@@ -111,7 +111,7 @@
 <section class="mx-auto max-w-[1400px] space-y-6 px-4 py-6">
     <div class="space-y-2">
         <p class="editorial-kicker">Gestion Joueurs</p>
-        <h1 class="font-display text-4xl font-black uppercase leading-[0.95]">Players Studio</h1>
+        <h1 class="font-display text-4xl font-black uppercase leading-[0.95]">Atelier joueurs</h1>
         <p class="text-sm text-muted-foreground">
             Ajoutez de nouveaux joueurs et modifiez les joueurs existants.
         </p>

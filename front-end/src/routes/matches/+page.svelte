@@ -139,9 +139,9 @@
     }
 
     function outcomeLabel(outcome: TeamOutcome) {
-        if (outcome === 'winner') return 'Winner';
-        if (outcome === 'defeated') return 'Defeated';
-        return 'Draw';
+        if (outcome === 'winner') return 'Victoire';
+        if (outcome === 'defeated') return 'Défaite';
+        return 'Nul';
     }
 
     function outcomeClass(outcome: TeamOutcome) {
@@ -340,7 +340,8 @@
                                                 <span class="mx-1 text-muted-foreground">-</span>
                                                 <span class={scoreClass(s2, s1)}>{s2}</span>
                                             </div>
-                                            <p class="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/80">Final score</p>
+                                            <p class="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/80">
+                                                Score final</p>
                                         </div>
 
                                         <div class="min-w-0 space-y-1.5">

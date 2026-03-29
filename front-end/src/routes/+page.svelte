@@ -43,7 +43,7 @@
     };
 
     const outcomeLabel = (outcome: TeamOutcome) =>
-        outcome === 'winner' ? 'Winner' : outcome === 'defeated' ? 'Defeated' : 'Draw';
+        outcome === 'winner' ? 'Victoire' : outcome === 'defeated' ? 'Défaite' : 'Nul';
     const outcomeClass = (outcome: TeamOutcome) =>
         outcome === 'winner' ? 'tone-positive' : outcome === 'defeated' ? 'tone-negative' : 'text-muted-foreground';
 
@@ -95,8 +95,9 @@
         <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(85,254,117,0.22),transparent_44%)]"></div>
         <div class="relative space-y-6 p-7 md:p-10">
             <div class="space-y-3">
-                <p class="editorial-kicker text-white/75">Player Dashboard</p>
-                <h1 class="font-display text-4xl font-black uppercase tracking-tight sm:text-5xl">Welcome Back, Champ.</h1>
+                <p class="editorial-kicker text-white/75">Tableau de bord</p>
+                <h1 class="font-display text-4xl font-black uppercase tracking-tight sm:text-5xl">Welcome back,
+                    champion.</h1>
                 <p class="max-w-2xl text-white/80">
                     Suivez les matchs, l'evolution du classement et les performances des joueurs.
                 </p>
@@ -143,7 +144,7 @@
                 class="overflow-hidden rounded-3xl bg-[hsl(var(--surface-container-low))]"
         >
             <CardHeader class="flex flex-row items-center justify-between gap-3 pb-2">
-                <CardTitle class="font-display text-3xl font-bold uppercase tracking-tight">Recent Matches</CardTitle>
+                <CardTitle class="font-display text-3xl font-bold uppercase tracking-tight">Matchs recents</CardTitle>
                 <Button class="h-8 rounded-lg px-3" href="/matches" variant="ghost">Voir tous</Button>
             </CardHeader>
             <CardContent>
@@ -194,7 +195,8 @@
                                                         <span class="mx-1 text-muted-foreground">-</span>
                                                         <span class={scoreClass(scoreB(g), scoreA(g))}>{scoreB(g)}</span>
                                                     </div>
-                                                    <p class="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/80">Final score</p>
+                                                    <p class="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/80">
+                                                        Score final</p>
                                                 </div>
 
                                                 <div class="min-w-0 space-y-1.5">
@@ -243,7 +245,8 @@
 
         <Card class="rounded-3xl bg-[hsl(var(--surface-container-low))]">
             <CardHeader class="pb-2">
-                <CardTitle class="font-display text-2xl font-bold uppercase tracking-tight">Top Contenders</CardTitle>
+                <CardTitle class="font-display text-2xl font-bold uppercase tracking-tight">Meilleurs joueurs
+                </CardTitle>
             </CardHeader>
             <CardContent>
                 {#if data?.top3?.length}

@@ -22,7 +22,7 @@
     const scopeOptions = [
         {value: "monthly", label: "Mensuel"},
         {value: "yearly", label: "Annuel"},
-        {value: "overall", label: "Global"}
+        {value: "overall", label: "General"}
     ];
 
     const monthNames = [
@@ -131,10 +131,11 @@
 <section class="mx-auto max-w-[1400px] space-y-6 px-4 py-6">
     <div class="grid gap-4 lg:grid-cols-[1.3fr_1fr] lg:items-end">
         <div class="space-y-3">
-            <p class="editorial-kicker">Global Leaderboard</p>
-            <h2 class="font-display text-5xl font-black uppercase leading-[0.92] text-foreground">The Pitch Elite.</h2>
+            <p class="editorial-kicker">Classement general</p>
+            <h2 class="font-display text-5xl font-black uppercase leading-[0.92] text-foreground">L'elite du
+                babyfoot.</h2>
             <p class="max-w-lg text-sm text-muted-foreground">
-                Every flick, block, and goal is recorded. Classement live de la ligue interne.
+                Chaque frappe, bloc et but est enregistre. Classement en direct de la ligue interne.
             </p>
         </div>
         <div class="surface-low grid grid-cols-3 items-end gap-2 rounded-2xl p-2">
@@ -154,7 +155,7 @@
                         {/if}
                     </div>
                     <div class={`flex items-center justify-center rounded-b-2xl border border-t-0 border-border/75 text-sm font-semibold uppercase tracking-[0.15em] ${podiumRank === 1 ? 'h-20 bg-primary/14 text-primary' : podiumRank === 2 ? 'h-14 bg-secondary/80 text-secondary-foreground' : 'h-12 bg-secondary/65 text-secondary-foreground'}`}>
-                        {podiumRank === 1 ? '1st' : podiumRank === 2 ? '2nd' : '3rd'}
+                        {podiumRank === 1 ? '1er' : podiumRank === 2 ? '2e' : '3e'}
                     </div>
                 </div>
             {/each}
@@ -241,7 +242,7 @@
                     <Table.Head class="h-8 text-[11px] uppercase tracking-[0.16em]">Joués</Table.Head>
                     <Table.Head class="h-8 text-[11px] uppercase tracking-[0.16em]">V</Table.Head>
                     <Table.Head class="h-8 text-[11px] uppercase tracking-[0.16em]">D</Table.Head>
-                    <Table.Head class="h-8 text-[11px] uppercase tracking-[0.16em]">Win %</Table.Head>
+                    <Table.Head class="h-8 text-[11px] uppercase tracking-[0.16em]">Taux V</Table.Head>
                     <Table.Head class="h-8 text-right text-[11px] uppercase tracking-[0.16em]">Elo</Table.Head>
                 </Table.Row>
             </Table.Header>
