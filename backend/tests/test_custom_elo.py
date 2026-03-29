@@ -6,8 +6,9 @@ from zoneinfo import ZoneInfo
 from backend.consts import DEFAULT_SIGMA
 
 try:
-    from backend.ranking.custom_elo import update_all_ratings
+    from backend.ranking.custom_elo import _mov_multiplier, update_all_ratings
 except ModuleNotFoundError:
+    _mov_multiplier = None
     update_all_ratings = None
 
 
@@ -48,7 +49,7 @@ class DummyGame:
     K: int = 16
 
 
-@unittest.skipIf(update_all_ratings is None, "Project dependencies are missing")
+@unittest.skipIf(update_all_ratings is None or _mov_multiplier is None, "Project dependencies are missing")
 class UpdateAllRatingsRegressionTests(unittest.TestCase):
     def _run_head_to_head(self, score_team1: int, score_team2: int, *, game_timestamp: dt.datetime | None = None):
         p1 = DummyPlayer(id=1, rating=DummyRank())
@@ -91,6 +92,16 @@ class UpdateAllRatingsRegressionTests(unittest.TestCase):
 
         self.assertEqual(winner.rating.last_updated, expected)
         self.assertEqual(loser.rating.last_updated, expected)
+
+    def test_mov_multiplier_matches_requested_bounds(self):
+        self.assertAlmostEqual(_mov_multiplier(10, 9), 1.0, places=9)
+        self.assertAlmostEqual(_mov_multiplier(10, 0), 2.0, places=9)
+        self.assertAlmostEqual(_mov_multiplier(10, -90), 2.0, places=9)
+
+    def test_mov_multiplier_accelerates_near_top(self):
+        step_low = _mov_multiplier(10, 8) - _mov_multiplier(10, 9)  # margin 2 - margin 1
+        step_high = _mov_multiplier(10, 0) - _mov_multiplier(10, 1)  # margin 10 - margin 9
+        self.assertGreater(step_high, step_low)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import datetime as _dt
+import math
 from typing import Any, Callable, Dict, List, Optional, Sequence, TYPE_CHECKING
 
 from sqlalchemy import delete
@@ -92,19 +93,30 @@ def _mov_multiplier(
         score1: float,
         score2: float,
         *,
-        mov_top: float = 1.25,
+        mov_top: float = 2.0,
         max_margin: float = 10.0,
+        min_margin: float = 1.0,
+        exp_k: float = 2.2,
 ) -> float:
     """
-    Mild margin-of-victory scaling for foosball.
+    Exponential margin-of-victory scaling for foosball.
 
-    Examples with mov_top=1.25:
-      10-9 -> 1.025
-      10-5 -> 1.125
-      10-0 -> 1.25
+    Targets:
+      - margin=1  (e.g. 10-9) -> 1.0
+      - margin=10 (e.g. 10-0) -> mov_top (default 2.0)
+      - Larger step sizes near mov_top (convex curve)
     """
     margin = min(max_margin, abs(float(score1) - float(score2)))
-    return 1.0 + (mov_top - 1.0) * (margin / max_margin)
+    if max_margin <= min_margin:
+        return float(mov_top)
+    if margin <= min_margin:
+        return 1.0
+
+    x = (margin - min_margin) / (max_margin - min_margin)  # 0..1
+    num = math.exp(exp_k * x) - 1.0
+    den = math.exp(exp_k) - 1.0
+    curve = num / den
+    return 1.0 + (mov_top - 1.0) * curve
 
 
 def update_all_ratings(
@@ -113,7 +125,7 @@ def update_all_ratings(
         team2: Sequence["Player"],
         rating_types: Optional[List[str]] = None,
         *,
-        mov_top: float = 1.25,
+        mov_top: float = 2.0,
         timestamp_tz: _dt.tzinfo = _dt.timezone.utc,
 ) -> None:
     """
