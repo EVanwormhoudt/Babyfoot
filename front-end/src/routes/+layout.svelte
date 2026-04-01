@@ -5,7 +5,7 @@
     import Sun from "@lucide/svelte/icons/sun";
     import Moon from "@lucide/svelte/icons/moon";
     import {Toaster} from "$lib/components/ui/sonner";
-    import {page} from '$app/state';
+    import {navigating, page} from '$app/state';
     import {getStoredCurrentPlayerId, setStoredCurrentPlayerId} from '$lib/current-player';
     import {base} from '$app/paths';
 
@@ -52,6 +52,8 @@
         if (href === '/') return pathname === '/';
         return pathname === href || pathname.startsWith(`${href}/`);
     }
+
+    const isNavigatingToAccueil = $derived(navigating.to?.url.pathname === '/');
 
     function initials(name: string | undefined) {
         if (!name) return 'BF';
@@ -169,12 +171,18 @@
                 {#each navItems as item (item.href)}
                     <a
                             href={item.href === '/stats' ? statsHref : item.href}
-                            class={`rounded-xl px-3 py-2 text-sm transition ${
+                            class={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
                                 isActive(item.href)
                                     ? 'bg-primary text-primary-foreground'
                                     : 'text-secondary-foreground hover:bg-secondary/70 hover:text-foreground'
                             }`}
                     >
+                        {#if item.href === '/' && isNavigatingToAccueil}
+                            <span
+                                    class="inline-block size-3.5 animate-spin rounded-full border-2 border-current border-r-transparent"
+                                    aria-hidden="true"
+                            ></span>
+                        {/if}
                         {item.label}
                     </a>
                 {/each}
