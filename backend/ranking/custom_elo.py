@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from sqlmodel import Session
 
 RATING_TYPES_ALL = ["overall", "monthly", "yearly"]
-DEFAULT_TEAMMATE_ADVANTAGE = 180.0
+DEFAULT_TEAMMATE_ADVANTAGE = 0.0
 
 
 def snapshot_player_ratings(
@@ -87,9 +87,9 @@ def _team_size_bonus(
         team_size_advantage: float = DEFAULT_TEAMMATE_ADVANTAGE,
 ) -> float:
     """
-    Extra expected-strength bonus for larger teams.
+    Optional expected-strength bonus for larger teams.
 
-    A solo player (size=1) gets no bonus; size=2 gets one full bonus step.
+    The default is disabled so equal-average teams stay at a 50/50 expectation.
     """
     if team_size <= 1 or team_size_advantage <= 0:
         return 0.0
@@ -141,7 +141,7 @@ def update_all_ratings(
 
     - Team strength = average player rating + teammate-count bonus
     - Win expectancy = standard Elo logistic
-    - Team delta = K * margin_multiplier * (score - expected)
+    - Team delta = K * average_team_size * margin_multiplier * (score - expected)
     - Delta is split equally among teammates
     - Sigma is retained in storage for compatibility, but not used or updated
     """
@@ -168,6 +168,7 @@ def update_all_ratings(
     K = float(getattr(game, "K", None) or 16.0)
     mov = _mov_multiplier(game.result_team1, game.result_team2, mov_top=mov_top)
     ts = game_ts or now
+    team_scale = (len(team1) + len(team2)) / 2.0
 
     def _getter(obj: Any, base: str) -> Callable[[str], float]:
         method = getattr(obj, f"get_{base}", None)
@@ -210,8 +211,8 @@ def update_all_ratings(
         e1 = expected(team1_rating, team2_rating)
         e2 = 1.0 - e1
 
-        delta_team1 = K * mov * (s1 - e1)
-        delta_team2 = K * mov * (s2 - e2)
+        delta_team1 = K * team_scale * mov * (s1 - e1)
+        delta_team2 = K * team_scale * mov * (s2 - e2)
 
         split1 = delta_team1 / len(team1)
         split2 = delta_team2 / len(team2)

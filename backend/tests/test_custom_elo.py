@@ -147,32 +147,52 @@ class UpdateAllRatingsRegressionTests(unittest.TestCase):
         self.assertEqual(p1.rating.mu_yearly, 1000.0)
         self.assertEqual(p1.rating.mu_monthly, 1000.0)
 
-    def test_solo_player_loses_less_in_one_vs_two_expected_loss(self):
+    def test_equal_average_loss_bounds_in_two_vs_two(self):
         p1 = DummyPlayer(id=1, rating=DummyRank())
         p2 = DummyPlayer(id=2, rating=DummyRank())
         p3 = DummyPlayer(id=3, rating=DummyRank())
-        game = DummyGame(
-            result_team1=5,
-            result_team2=1,
+        p4 = DummyPlayer(id=4, rating=DummyRank())
+        close_game = DummyGame(
+            result_team1=10,
+            result_team2=9,
             game_timestamp=dt.datetime(2026, 3, 5, 20, 0, tzinfo=dt.timezone.utc),
         )
 
         update_all_ratings(
-            game,
+            close_game,
             [p1, p2],
-            [p3],
+            [p3, p4],
             rating_types=["overall"],
             timestamp_tz=dt.timezone.utc,
         )
 
-        winner_delta_a = p1.rating.mu_overall - 1000.0
-        winner_delta_b = p2.rating.mu_overall - 1000.0
-        solo_loser_delta = p3.rating.mu_overall - 1000.0
+        close_win = p1.rating.mu_overall - 1000.0
+        close_loss = p3.rating.mu_overall - 1000.0
+        self.assertAlmostEqual(close_win, 8.0, places=9)
+        self.assertAlmostEqual(close_loss, -8.0, places=9)
 
-        self.assertAlmostEqual(winner_delta_a, winner_delta_b, places=9)
-        self.assertLess(solo_loser_delta, 0.0)
-        self.assertLess(abs(solo_loser_delta), 6.0)
-        self.assertAlmostEqual(winner_delta_a + winner_delta_b + solo_loser_delta, 0.0, places=9)
+        p1 = DummyPlayer(id=1, rating=DummyRank())
+        p2 = DummyPlayer(id=2, rating=DummyRank())
+        p3 = DummyPlayer(id=3, rating=DummyRank())
+        p4 = DummyPlayer(id=4, rating=DummyRank())
+        blowout_game = DummyGame(
+            result_team1=10,
+            result_team2=0,
+            game_timestamp=dt.datetime(2026, 3, 5, 20, 0, tzinfo=dt.timezone.utc),
+        )
+
+        update_all_ratings(
+            blowout_game,
+            [p1, p2],
+            [p3, p4],
+            rating_types=["overall"],
+            timestamp_tz=dt.timezone.utc,
+        )
+
+        blowout_win = p1.rating.mu_overall - 1000.0
+        blowout_loss = p3.rating.mu_overall - 1000.0
+        self.assertAlmostEqual(blowout_win, 16.0, places=9)
+        self.assertAlmostEqual(blowout_loss, -16.0, places=9)
 
 
 if __name__ == "__main__":
