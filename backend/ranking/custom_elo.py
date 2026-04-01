@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from sqlmodel import Session
 
 RATING_TYPES_ALL = ["overall", "monthly", "yearly"]
+DEFAULT_TEAMMATE_ADVANTAGE = 180.0
 
 
 def snapshot_player_ratings(
@@ -80,6 +81,21 @@ def _rating_types_for_game(
     return rating_types
 
 
+def _team_size_bonus(
+        team_size: int,
+        *,
+        team_size_advantage: float = DEFAULT_TEAMMATE_ADVANTAGE,
+) -> float:
+    """
+    Extra expected-strength bonus for larger teams.
+
+    A solo player (size=1) gets no bonus; size=2 gets one full bonus step.
+    """
+    if team_size <= 1 or team_size_advantage <= 0:
+        return 0.0
+    return float(team_size_advantage) * math.log2(float(team_size))
+
+
 def _mov_multiplier(
         score1: float,
         score2: float,
@@ -117,12 +133,13 @@ def update_all_ratings(
         rating_types: Optional[List[str]] = None,
         *,
         mov_top: float = 2.0,
+        team_size_advantage: float = DEFAULT_TEAMMATE_ADVANTAGE,
         timestamp_tz: _dt.tzinfo = _dt.timezone.utc,
 ) -> None:
     """
     Simple team Elo for foosball.
 
-    - Team strength = average player rating
+    - Team strength = average player rating + teammate-count bonus
     - Win expectancy = standard Elo logistic
     - Team delta = K * margin_multiplier * (score - expected)
     - Delta is split equally among teammates
@@ -178,8 +195,14 @@ def update_all_ratings(
                 raise ValueError(f"Player {player.id} is missing a rating row")
             return _getter(player.rating, "mu")(rating_type)
 
-        team1_rating = sum(player_mu(p) for p in team1) / len(team1)
-        team2_rating = sum(player_mu(p) for p in team2) / len(team2)
+        team1_rating = (
+                (sum(player_mu(p) for p in team1) / len(team1))
+                + _team_size_bonus(len(team1), team_size_advantage=team_size_advantage)
+        )
+        team2_rating = (
+                (sum(player_mu(p) for p in team2) / len(team2))
+                + _team_size_bonus(len(team2), team_size_advantage=team_size_advantage)
+        )
 
         def expected(cur_rating: float, opp_rating: float) -> float:
             return 1.0 / (1.0 + 10.0 ** ((opp_rating - cur_rating) / 400.0))

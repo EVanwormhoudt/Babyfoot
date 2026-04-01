@@ -147,6 +147,33 @@ class UpdateAllRatingsRegressionTests(unittest.TestCase):
         self.assertEqual(p1.rating.mu_yearly, 1000.0)
         self.assertEqual(p1.rating.mu_monthly, 1000.0)
 
+    def test_solo_player_loses_less_in_one_vs_two_expected_loss(self):
+        p1 = DummyPlayer(id=1, rating=DummyRank())
+        p2 = DummyPlayer(id=2, rating=DummyRank())
+        p3 = DummyPlayer(id=3, rating=DummyRank())
+        game = DummyGame(
+            result_team1=5,
+            result_team2=1,
+            game_timestamp=dt.datetime(2026, 3, 5, 20, 0, tzinfo=dt.timezone.utc),
+        )
+
+        update_all_ratings(
+            game,
+            [p1, p2],
+            [p3],
+            rating_types=["overall"],
+            timestamp_tz=dt.timezone.utc,
+        )
+
+        winner_delta_a = p1.rating.mu_overall - 1000.0
+        winner_delta_b = p2.rating.mu_overall - 1000.0
+        solo_loser_delta = p3.rating.mu_overall - 1000.0
+
+        self.assertAlmostEqual(winner_delta_a, winner_delta_b, places=9)
+        self.assertLess(solo_loser_delta, 0.0)
+        self.assertLess(abs(solo_loser_delta), 6.0)
+        self.assertAlmostEqual(winner_delta_a + winner_delta_b + solo_loser_delta, 0.0, places=9)
+
 
 if __name__ == "__main__":
     unittest.main()
