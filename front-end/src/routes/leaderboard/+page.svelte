@@ -142,7 +142,7 @@
             {#each podiumOrder as podiumRank}
                 {@const row = rankedPlayers.find((player) => player.rank === podiumRank)}
                 <div class="flex flex-col">
-                    <div class={`rounded-t-2xl border border-border/75 bg-card px-2 text-center shadow-[0_14px_24px_rgba(12,15,16,0.06)] ${podiumRank === 1 ? 'min-h-[116px] py-3' : 'min-h-[96px] py-2'} ${row && isCurrentPlayer(row) ? 'ring-2 ring-primary/40' : ''}`}>
+                    <div class={`rounded-t-2xl border border-border/75 bg-card px-2 text-center shadow-[0_14px_24px_rgba(12,15,16,0.06)] dark:border-white/12 dark:bg-[linear-gradient(180deg,hsl(var(--card))_0%,hsl(var(--surface-container-low))_100%)] dark:shadow-[0_16px_26px_rgba(0,0,0,0.38)] ${podiumRank === 1 ? 'min-h-[116px] py-3 dark:bg-[linear-gradient(180deg,hsl(var(--card))_0%,hsl(var(--primary)/0.2)_100%)]' : 'min-h-[96px] py-2'} ${row && isCurrentPlayer(row) ? 'ring-2 ring-primary/40 dark:ring-primary/60' : ''}`}>
                         <p class="text-[10px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">#{String(podiumRank).padStart(2, '0')}</p>
                         {#if row}
                             <p class="mt-1 truncate text-sm font-semibold">{row.name}</p>
@@ -154,7 +154,7 @@
                             <p class="mt-5 text-xs text-muted-foreground">Aucun joueur</p>
                         {/if}
                     </div>
-                    <div class={`flex items-center justify-center rounded-b-2xl border border-t-0 border-border/75 text-sm font-semibold uppercase tracking-[0.15em] ${podiumRank === 1 ? 'h-20 bg-primary/14 text-primary' : podiumRank === 2 ? 'h-14 bg-secondary/80 text-secondary-foreground' : 'h-12 bg-secondary/65 text-secondary-foreground'}`}>
+                    <div class={`flex items-center justify-center rounded-b-2xl border border-t-0 border-border/75 text-sm font-semibold uppercase tracking-[0.15em] dark:border-white/12 ${podiumRank === 1 ? 'h-20 bg-primary/14 text-primary dark:border-[hsl(var(--primary-container)/0.58)] dark:bg-[linear-gradient(180deg,hsl(var(--primary-container)/0.98),hsl(var(--primary-container)/0.82))] dark:text-[hsl(var(--primary-container-foreground))]' : podiumRank === 2 ? 'h-14 bg-secondary/80 text-secondary-foreground dark:bg-[linear-gradient(180deg,hsl(var(--surface-container-high)),hsl(var(--surface-container-low)))] dark:text-foreground' : 'h-12 bg-secondary/65 text-secondary-foreground dark:bg-[linear-gradient(180deg,hsl(var(--surface-container-high)/0.9),hsl(var(--surface-container-low)/0.95))] dark:text-foreground/90'}`}>
                         {podiumRank === 1 ? '1er' : podiumRank === 2 ? '2e' : '3e'}
                     </div>
                 </div>
@@ -248,13 +248,13 @@
             </Table.Header>
             <Table.Body class="[&_tr:last-child]:border-0">
                 {#each rankedPlayers as player (player.rank)}
-                    <Table.Row class={`border-0 bg-card hover:bg-card ${player.rank === 1 ? 'ring-1 ring-primary/35 shadow-[0_0_0_1px_hsl(var(--primary)/0.08)_inset]' : ''} ${isCurrentPlayer(player) ? 'ring-2 ring-primary/40 bg-primary/5' : ''}`}>
+                    <Table.Row class={`border-0 bg-card hover:bg-card dark:bg-[hsl(var(--surface-container-high)/0.6)] dark:hover:bg-[hsl(var(--surface-container-high)/0.82)] ${player.rank === 1 ? 'ring-1 ring-primary/35 shadow-[0_0_0_1px_hsl(var(--primary)/0.08)_inset] dark:ring-primary/50 dark:shadow-[0_0_0_1px_hsl(var(--primary)/0.24)_inset]' : ''} ${isCurrentPlayer(player) ? 'ring-2 ring-primary/40 bg-primary/5 dark:ring-primary/65 dark:bg-[hsl(var(--primary)/0.16)]' : ''}`}>
                         <Table.Cell class="rounded-l-xl px-5 font-medium">
                             <div class="flex items-center gap-3">
                                 <span class={`inline-flex min-w-[48px] justify-center rounded-lg px-2 py-1 font-display text-sm font-bold ${
                                     player.rank === 1
                                         ? 'bg-primary text-primary-foreground'
-                                        : 'bg-secondary text-secondary-foreground'
+                                        : 'bg-secondary text-secondary-foreground dark:bg-[hsl(var(--surface-container-low))] dark:text-foreground'
                                 }`}>
                                     #{String(player.rank).padStart(2, '0')}
                                 </span>

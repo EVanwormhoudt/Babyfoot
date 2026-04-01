@@ -49,8 +49,8 @@
 
     const scoreClass = (left: number, right: number) => (left > right ? 'tone-positive' : 'text-foreground');
 
-    const getOverallDelta = (g: GameRead, playerId: number): number | null => {
-        const change = g.rating_changes?.find((item) => item.player_id === playerId && item.rating_type === 'overall');
+    const getYearlyDelta = (g: GameRead, playerId: number): number | null => {
+        const change = g.rating_changes?.find((item) => item.player_id === playerId && item.rating_type === 'yearly');
         return typeof change?.delta_mu === 'number' ? change.delta_mu : null;
     };
 
@@ -106,7 +106,7 @@
                 <Button class="bg-white text-primary hover:bg-white/90" href="/create" size="lg">
                     Nouveau Match
                 </Button>
-                <Button class="border border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" href="/leaderboard" size="lg" variant="outline">
+                <Button class="border border-white bg-white/10 text-white hover:bg-white/20 hover:text-white" href="/leaderboard" size="lg" variant="outline">
                     Voir le Classement
                 </Button>
             </div>
@@ -178,7 +178,7 @@
                                                 <div class="space-y-1.5 pt-5 text-right">
                                                     {#if team1Players.length}
                                                         {#each team1Players as p}
-                                                            {@const deltaValue = getOverallDelta(g, p.id)}
+                                                            {@const deltaValue = getYearlyDelta(g, p.id)}
                                                             {@const deltaLabel = formatDelta(deltaValue)}
                                                             {#if deltaLabel}
                                                                 <p class={`text-[1.05rem] font-semibold tabular-nums ${deltaClass(deltaValue)}`}>{deltaLabel}</p>
@@ -195,8 +195,7 @@
                                                         <span class="mx-1 text-muted-foreground">-</span>
                                                         <span class={scoreClass(scoreB(g), scoreA(g))}>{scoreB(g)}</span>
                                                     </div>
-                                                    <p class="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/80">
-                                                        Score final</p>
+
                                                 </div>
 
                                                 <div class="min-w-0 space-y-1.5">
@@ -213,7 +212,7 @@
                                                 <div class="space-y-1.5 pt-5 text-right">
                                                     {#if team2Players.length}
                                                         {#each team2Players as p}
-                                                            {@const deltaValue = getOverallDelta(g, p.id)}
+                                                            {@const deltaValue = getYearlyDelta(g, p.id)}
                                                             {@const deltaLabel = formatDelta(deltaValue)}
                                                             {#if deltaLabel}
                                                                 <p class={`text-[1.05rem] font-semibold tabular-nums ${deltaClass(deltaValue)}`}>{deltaLabel}</p>
