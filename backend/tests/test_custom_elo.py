@@ -103,6 +103,50 @@ class UpdateAllRatingsRegressionTests(unittest.TestCase):
         step_high = _mov_multiplier(10, 0) - _mov_multiplier(10, 1)  # margin 10 - margin 9
         self.assertGreater(step_high, step_low)
 
+    def test_default_rating_types_include_yearly_and_monthly_for_dated_games(self):
+        p1 = DummyPlayer(id=1, rating=DummyRank())
+        p2 = DummyPlayer(id=2, rating=DummyRank())
+        game = DummyGame(
+            result_team1=10,
+            result_team2=7,
+            # Keep this in the past relative to "now" so we guard against
+            # regressions that only included the current year.
+            game_timestamp=dt.datetime(2025, 6, 1, 12, 0, tzinfo=dt.timezone.utc),
+        )
+
+        update_all_ratings(
+            game,
+            [p1],
+            [p2],
+            rating_types=None,
+            timestamp_tz=dt.timezone.utc,
+        )
+
+        self.assertNotEqual(p1.rating.mu_overall, 1000.0)
+        self.assertNotEqual(p1.rating.mu_yearly, 1000.0)
+        self.assertNotEqual(p1.rating.mu_monthly, 1000.0)
+
+    def test_default_rating_types_for_undated_games_stay_overall_only(self):
+        p1 = DummyPlayer(id=1, rating=DummyRank())
+        p2 = DummyPlayer(id=2, rating=DummyRank())
+        game = DummyGame(
+            result_team1=10,
+            result_team2=7,
+            game_timestamp=None,
+        )
+
+        update_all_ratings(
+            game,
+            [p1],
+            [p2],
+            rating_types=None,
+            timestamp_tz=dt.timezone.utc,
+        )
+
+        self.assertNotEqual(p1.rating.mu_overall, 1000.0)
+        self.assertEqual(p1.rating.mu_yearly, 1000.0)
+        self.assertEqual(p1.rating.mu_monthly, 1000.0)
+
 
 if __name__ == "__main__":
     unittest.main()

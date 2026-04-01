@@ -70,21 +70,12 @@ def _normalize_ts(
     return ts.astimezone(tz)
 
 
-def _period_starts(now: _dt.datetime) -> tuple[_dt.datetime, _dt.datetime]:
-    first_of_year = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    return first_of_year, first_of_month
-
-
 def _rating_types_for_game(
         game_ts: Optional[_dt.datetime],
-        first_of_year: _dt.datetime,
-        first_of_month: _dt.datetime,
 ) -> List[str]:
     rating_types = ["overall"]
-    if game_ts is not None and game_ts >= first_of_year:
+    if game_ts is not None:
         rating_types.append("yearly")
-    if game_ts is not None and game_ts >= first_of_month:
         rating_types.append("monthly")
     return rating_types
 
@@ -145,11 +136,10 @@ def update_all_ratings(
         raise ValueError("A player cannot be on both teams.")
 
     now = _dt.datetime.now(timestamp_tz)
-    first_of_year, first_of_month = _period_starts(now)
     game_ts = _normalize_ts(getattr(game, "game_timestamp", None), timestamp_tz)
 
     if rating_types is None:
-        rating_types = _rating_types_for_game(game_ts, first_of_year, first_of_month)
+        rating_types = _rating_types_for_game(game_ts)
 
     if game.result_team1 > game.result_team2:
         s1, s2 = 1.0, 0.0
@@ -224,11 +214,10 @@ def recalculate_all_ratings(session: "Session") -> None:
     """
     Rebuild current ratings by replaying every saved game in chronological order.
 
-    Monthly/yearly ratings are rebuilt using the same current-window logic as
-    normal live updates.
+    Monthly/yearly ratings are replayed across the full history with resets at
+    month/year boundaries so per-game deltas are available for historical games.
     """
     now = _dt.datetime.now(tz=settings.tz)
-    first_of_year, first_of_month = _period_starts(now)
 
     players = session.exec(
         select(Player).options(selectinload(Player.rating))
@@ -269,6 +258,23 @@ def recalculate_all_ratings(session: "Session") -> None:
         .order_by(Game.game_timestamp.asc(), Game.id.asc())
     ).all()
 
+    active_month_key: Optional[tuple[int, int]] = None
+    active_year: Optional[int] = None
+
+    def _reset_monthly() -> None:
+        for player in players:
+            if player.rating is None:
+                continue
+            player.rating.mu_monthly = DEFAULT_RATING
+            player.rating.sigma_monthly = DEFAULT_SIGMA
+
+    def _reset_yearly() -> None:
+        for player in players:
+            if player.rating is None:
+                continue
+            player.rating.mu_yearly = DEFAULT_RATING
+            player.rating.sigma_yearly = DEFAULT_SIGMA
+
     for game in games:
         team1: list[Player] = []
         team2: list[Player] = []
@@ -289,7 +295,18 @@ def recalculate_all_ratings(session: "Session") -> None:
             raise ValueError(f"Game {game.id} must have players on both teams")
 
         game_ts = _normalize_ts(game.game_timestamp, settings.tz)
-        rating_types = _rating_types_for_game(game_ts, first_of_year, first_of_month)
+        if game_ts is not None:
+            month_key = (game_ts.year, game_ts.month)
+            if active_month_key is not None and month_key != active_month_key:
+                _reset_monthly()
+
+            if active_year is not None and game_ts.year != active_year:
+                _reset_yearly()
+
+            active_month_key = month_key
+            active_year = game_ts.year
+
+        rating_types = _rating_types_for_game(game_ts)
 
         players_in_game = team1 + team2
         before = snapshot_player_ratings(players_in_game, rating_types)
@@ -312,3 +329,12 @@ def recalculate_all_ratings(session: "Session") -> None:
                 rating_types,
         ):
             session.add(row)
+
+    # Keep current-period rank semantics consistent when there is no game in
+    # the active month/year.
+    if active_year is not None and active_year != now.year:
+        _reset_yearly()
+
+    current_month_key = (now.year, now.month)
+    if active_month_key is not None and active_month_key != current_month_key:
+        _reset_monthly()

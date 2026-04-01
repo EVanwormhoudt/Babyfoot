@@ -12,6 +12,7 @@ from sqlmodel import Session, select
 from .db_errors import map_integrity_error
 from ..db.models import Game, Team, Player, GamePlayerRatingChange
 from ..db.session import get_session
+from ..consts import DEFAULT_RATING, DEFAULT_SIGMA
 from ..ranking import (
     recalculate_all_ratings,
     update_all_ratings,
@@ -243,11 +244,32 @@ def delete_game(game_id: int, session: Session = Depends(get_session)):
 
             if all(players_by_id.get(pid) and players_by_id[pid].rating for pid in player_ids):
                 now = datetime.now(tz=settings.tz)
+                game_ts = g.game_timestamp
+                if game_ts is not None and game_ts.tzinfo is not None:
+                    game_ts = game_ts.astimezone(settings.tz)
+                elif game_ts is not None:
+                    game_ts = game_ts.replace(tzinfo=settings.tz)
+
                 try:
                     for row in g.rating_changes:
                         player = players_by_id[row.player_id]
-                        player.rating.set_mu(row.rating_type, row.mu_before)
-                        player.rating.set_sigma(row.rating_type, row.sigma_before)
+                        if row.rating_type == "yearly":
+                            if game_ts is None or game_ts.year != now.year:
+                                player.rating.set_mu(row.rating_type, DEFAULT_RATING)
+                                player.rating.set_sigma(row.rating_type, DEFAULT_SIGMA)
+                            else:
+                                player.rating.set_mu(row.rating_type, row.mu_before)
+                                player.rating.set_sigma(row.rating_type, row.sigma_before)
+                        elif row.rating_type == "monthly":
+                            if game_ts is None or (game_ts.year, game_ts.month) != (now.year, now.month):
+                                player.rating.set_mu(row.rating_type, DEFAULT_RATING)
+                                player.rating.set_sigma(row.rating_type, DEFAULT_SIGMA)
+                            else:
+                                player.rating.set_mu(row.rating_type, row.mu_before)
+                                player.rating.set_sigma(row.rating_type, row.sigma_before)
+                        else:
+                            player.rating.set_mu(row.rating_type, row.mu_before)
+                            player.rating.set_sigma(row.rating_type, row.sigma_before)
                         player.rating.last_updated = now
 
                     for row in g.rating_changes:
