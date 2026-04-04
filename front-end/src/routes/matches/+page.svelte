@@ -265,12 +265,13 @@
 	}
 
 	async function clearDates() {
+		range = undefined;
 		const sp = new URLSearchParams(page.url.searchParams);
 		sp.delete('start_date');
 		sp.delete('end_date');
 		sp.set('page', '1');
 
-		goto(`?${sp.toString()}`, { replaceState: true });
+		await goto(`?${sp.toString()}`, {replaceState: true});
 	}
 
 	function setMonth(offset = 0) {
@@ -291,55 +292,7 @@
 </script>
 
 <div class="mx-auto max-w-[1400px] space-y-6 px-4 py-4">
-	<section
-		class="relative overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,hsl(var(--primary))_0%,hsl(146_79%_24%)_100%)] text-primary-foreground shadow-[0_20px_46px_rgba(0,107,36,0.28)]"
-	>
-		<div
-			class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(85,254,117,0.22),transparent_44%)]"
-		></div>
-		<div class="relative space-y-6 p-7 md:p-10">
-			<div class="space-y-3">
-				<p class="editorial-kicker text-white/75">Match center</p>
-				<h1 class="font-display text-4xl font-black uppercase tracking-tight sm:text-5xl">
-					Historique des matchs
-				</h1>
-				<p class="max-w-2xl text-white/80">
-					Filtrez les rencontres, modifiez les scores et gardez une vue complete sur la saison.
-				</p>
-			</div>
 
-			<div class="flex flex-wrap gap-3">
-				<Button class="bg-white text-primary hover:bg-white/90" href="/create" size="lg">
-					Nouveau Match
-				</Button>
-				<Button
-					class="border border-white bg-white/10 text-white hover:bg-white/20 hover:text-white"
-					href="/leaderboard"
-					size="lg"
-					variant="outline"
-				>
-					Voir le Classement
-				</Button>
-			</div>
-
-			<div class="flex flex-wrap gap-2 text-xs">
-				<span class="bg-white/12 rounded-full px-3 py-1 text-white/80">
-					{data.total} matchs au total
-				</span>
-				<span class="bg-white/12 rounded-full px-3 py-1 text-white/80">
-					Page {data.page} / {data.pageCount}
-				</span>
-				<span class="bg-white/12 rounded-full px-3 py-1 text-white/80">
-					{data.limit} matchs par page
-				</span>
-				{#if data.start_date && data.end_date}
-					<span class="bg-white/12 rounded-full px-3 py-1 text-white/80">
-						Periode : {data.start_date} - {data.end_date}
-					</span>
-				{/if}
-			</div>
-		</div>
-	</section>
 
 	<section class="rounded-3xl bg-[hsl(var(--surface-container-low))] p-4 md:p-5">
 		<div class="flex flex-wrap items-center justify-between gap-3">

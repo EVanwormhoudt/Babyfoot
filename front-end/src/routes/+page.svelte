@@ -47,7 +47,7 @@
     const outcomeClass = (outcome: TeamOutcome) =>
         outcome === 'winner' ? 'tone-positive' : outcome === 'defeated' ? 'tone-negative' : 'text-muted-foreground';
 
-    const scoreClass = (left: number, right: number) => (left > right ? 'tone-positive' : 'text-foreground');
+    const scoreClass = (_left: number, _right: number) => 'text-foreground';
 
     const getYearlyDelta = (g: GameRead, playerId: number): number | null => {
         const change = g.rating_changes?.find((item) => item.player_id === playerId && item.rating_type === 'yearly');
@@ -64,6 +64,41 @@
         if (delta > 0) return 'tone-positive';
         if (delta < 0) return 'tone-negative';
         return 'text-muted-foreground';
+    };
+
+    type DeltaRow = {
+        text: string;
+        className: string;
+    };
+
+    const teamDeltaRows = (g: GameRead, players: Player[]): DeltaRow[] => {
+        const deltas = players.map((player) => getYearlyDelta(g, player.id));
+        const firstNumeric = deltas.find((value): value is number => value !== null);
+        const allSameNumeric =
+            firstNumeric !== undefined &&
+            deltas.every((value) => value !== null && Math.abs(value - firstNumeric) < 1e-9);
+
+        return deltas.map((delta, index) => {
+            if (allSameNumeric && index > 0) {
+                return {
+                    text: '',
+                    className: 'text-muted-foreground/65'
+                };
+            }
+
+            const formatted = formatDelta(delta);
+            if (formatted) {
+                return {
+                    text: formatted,
+                    className: deltaClass(delta)
+                };
+            }
+
+            return {
+                text: '—',
+                className: 'text-muted-foreground/40'
+            };
+        });
     };
 
     const dateDMY = (iso: string) =>
@@ -155,9 +190,11 @@
                             {@const outcome2 = teamOutcome(g, 2)}
                             {@const team1Players = teamPlayers(g, 1)}
                             {@const team2Players = teamPlayers(g, 2)}
+                            {@const team1DeltaRows = teamDeltaRows(g, team1Players)}
+                            {@const team2DeltaRows = teamDeltaRows(g, team2Players)}
                             <li>
                                 <a
-                                        class="group block rounded-2xl border border-border/65 bg-card/90 px-4 py-4 transition hover:border-border"
+                                        class="block rounded-2xl border border-border/65 bg-card/90 px-4 py-4 transition hover:border-border/90"
                                         href={`/matches/${g.id}`}
                                         aria-label="Ouvrir les details du match"
                                 >
@@ -176,21 +213,13 @@
                                                 </div>
 
                                                 <div class="space-y-1.5 pt-5 text-right">
-                                                    {#if team1Players.length}
-                                                        {#each team1Players as p}
-                                                            {@const deltaValue = getYearlyDelta(g, p.id)}
-                                                            {@const deltaLabel = formatDelta(deltaValue)}
-                                                            {#if deltaLabel}
-                                                                <p class={`text-[1.05rem] font-semibold tabular-nums ${deltaClass(deltaValue)}`}>{deltaLabel}</p>
-                                                            {:else}
-                                                                <p class="text-[1.05rem] tabular-nums text-muted-foreground/40">—</p>
-                                                            {/if}
-                                                        {/each}
-                                                    {/if}
+                                                    {#each team1DeltaRows as row}
+                                                        <p class={`text-[1.05rem] font-semibold tabular-nums ${row.className}`}>{row.text}</p>
+                                                    {/each}
                                                 </div>
 
                                                 <div class="min-w-[96px] text-center">
-                                                    <div class="font-display text-[2rem] font-bold leading-none tabular-nums sm:text-[2.2rem]">
+                                                    <div class="font-display text-[2rem] font-bold tabular-nums leading-none sm:text-[2.2rem]">
                                                         <span class={scoreClass(scoreA(g), scoreB(g))}>{scoreA(g)}</span>
                                                         <span class="mx-1 text-muted-foreground">-</span>
                                                         <span class={scoreClass(scoreB(g), scoreA(g))}>{scoreB(g)}</span>
@@ -210,24 +239,18 @@
                                                 </div>
 
                                                 <div class="space-y-1.5 pt-5 text-right">
-                                                    {#if team2Players.length}
-                                                        {#each team2Players as p}
-                                                            {@const deltaValue = getYearlyDelta(g, p.id)}
-                                                            {@const deltaLabel = formatDelta(deltaValue)}
-                                                            {#if deltaLabel}
-                                                                <p class={`text-[1.05rem] font-semibold tabular-nums ${deltaClass(deltaValue)}`}>{deltaLabel}</p>
-                                                            {:else}
-                                                                <p class="text-[1.05rem] tabular-nums text-muted-foreground/40">—</p>
-                                                            {/if}
-                                                        {/each}
-                                                    {/if}
+                                                    {#each team2DeltaRows as row}
+                                                        <p class={`text-[1.05rem] font-semibold tabular-nums ${row.className}`}>{row.text}</p>
+                                                    {/each}
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div class="text-right text-xs text-muted-foreground">
-                                            <p class="font-semibold text-foreground/80">{timeHHMM(g.game_timestamp)}</p>
-                                            <p class="uppercase tracking-[0.08em]">{dateDMY(g.game_timestamp)}</p>
+                                        <div class="flex items-center justify-end gap-3">
+                                            <div class="text-right text-xs text-muted-foreground">
+                                                <p class="font-semibold text-foreground/80">{timeHHMM(g.game_timestamp)}</p>
+                                                <p class="uppercase tracking-[0.08em]">Match #{g.id}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </a>
