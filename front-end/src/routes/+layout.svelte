@@ -55,12 +55,12 @@
 	const isNavigatingToAccueil = $derived(navigating.to?.url.pathname === '/');
 	const toastOffset = $derived(page.url.pathname.startsWith('/create') ? '96px' : '24px');
 
-    function initials(name: string | undefined) {
-        if (!name) return 'BF';
-        const parts = name.trim().split(/\s+/).filter(Boolean);
-        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-        return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
-    }
+	function initials(name: string | undefined) {
+		if (!name) return 'BF';
+		const parts = name.trim().split(/\s+/).filter(Boolean);
+		if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+		return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
+	}
 
 	function themeToggleLabel() {
 		return mode.current === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre';
