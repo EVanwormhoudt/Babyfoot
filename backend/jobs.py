@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, date
+import logging
 from typing import Dict, Iterable
 
-from sqlalchemy import update, insert, func
+from sqlalchemy import update, insert, func, literal
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy import desc, asc
 from sqlmodel import Session
@@ -12,6 +13,8 @@ from backend.db.session import engine
 from backend.consts import DEFAULT_RATING, DEFAULT_SIGMA
 from backend.db import CurrentPlayerRank, PlayerRatingHistory
 from backend.settings import settings
+
+logger = logging.getLogger(__name__)
 
 monthly_rank_expr = func.dense_rank().over(
     order_by=(desc(CurrentPlayerRank.mu_monthly), asc(CurrentPlayerRank.sigma_monthly))
@@ -102,6 +105,14 @@ def _build_daily_overall_snapshot_rows(
     return rows_to_insert
 
 
+def _snapshot_date_expr(snapshot_date: date):
+    return literal(snapshot_date.isoformat()).cast(PlayerRatingHistory.date.type)
+
+
+def _rank_type_expr(rank_type: str):
+    return literal(rank_type)
+
+
 def snapshot_and_reset_monthly():
     today = datetime.now(tz=settings.tz).date()
 
@@ -112,9 +123,9 @@ def snapshot_and_reset_monthly():
                 CurrentPlayerRank.player_id.label("player_id"),
                 CurrentPlayerRank.mu_monthly.label("mu"),
                 CurrentPlayerRank.sigma_monthly.label("sigma"),
-                func.cast(func.literal(today.isoformat()), PlayerRatingHistory.date.type).label("date"),
+                _snapshot_date_expr(today).label("date"),
                 monthly_rank_expr.label("rank"),
-                func.literal("monthly").label("rank_type"),
+                _rank_type_expr("monthly").label("rank_type"),
             )
         ).subquery()
 
@@ -147,7 +158,7 @@ def snapshot_and_reset_monthly():
 
         session.commit()
 
-    print("✅ Monthly ratings snapshotted + reset")
+    logger.info("Monthly ratings snapshotted and reset")
 
 
 def snapshot_and_reset_yearly():
@@ -159,9 +170,9 @@ def snapshot_and_reset_yearly():
                 CurrentPlayerRank.player_id.label("player_id"),
                 CurrentPlayerRank.mu_yearly.label("mu"),
                 CurrentPlayerRank.sigma_yearly.label("sigma"),
-                func.cast(func.literal(today.isoformat()), PlayerRatingHistory.date.type).label("date"),
+                _snapshot_date_expr(today).label("date"),
                 yearly_rank_expr.label("rank"),
-                func.literal("yearly").label("rank_type"),
+                _rank_type_expr("yearly").label("rank_type"),
             )
         ).subquery()
 
@@ -190,7 +201,7 @@ def snapshot_and_reset_yearly():
         )
         session.commit()
 
-    print("✅ Yearly ratings snapshotted + reset")
+    logger.info("Yearly ratings snapshotted and reset")
 
 
 def snapshot_overall_daily_if_changed():
@@ -222,7 +233,7 @@ def snapshot_overall_daily_if_changed():
         )
 
         if not rows_to_insert:
-            print("ℹ️ Daily overall snapshot skipped (no Elo changes)")
+            logger.info("Daily overall snapshot skipped because no ratings changed")
             return
 
         try:
@@ -252,4 +263,4 @@ def snapshot_overall_daily_if_changed():
 
         session.commit()
 
-    print(f"✅ Daily overall ratings snapshotted ({len(rows_to_insert)} player rows)")
+    logger.info("Daily overall ratings snapshotted for %s players", len(rows_to_insert))

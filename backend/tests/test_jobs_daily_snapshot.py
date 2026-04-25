@@ -2,10 +2,19 @@ import datetime as dt
 import unittest
 
 try:
-    from backend.jobs import _build_daily_overall_snapshot_rows, _has_overall_snapshot_changed
+    from sqlalchemy.dialects import postgresql
+
+    from backend.jobs import (
+        _build_daily_overall_snapshot_rows,
+        _has_overall_snapshot_changed,
+        _rank_type_expr,
+        _snapshot_date_expr,
+    )
 except ModuleNotFoundError:
     _build_daily_overall_snapshot_rows = None
     _has_overall_snapshot_changed = None
+    _rank_type_expr = None
+    _snapshot_date_expr = None
 
 
 @unittest.skipIf(
@@ -43,6 +52,15 @@ class DailyOverallSnapshotTests(unittest.TestCase):
         for row in rows:
             self.assertEqual(row["rank_type"], "overall")
             self.assertEqual(row["date"], snapshot_date)
+
+    def test_snapshot_date_expr_compiles_to_bound_date_literal(self):
+        compiled = str(_snapshot_date_expr(dt.date(2026, 3, 28)).compile(dialect=postgresql.dialect()))
+        self.assertIn("CAST(", compiled)
+        self.assertNotIn("literal(", compiled)
+
+    def test_rank_type_expr_compiles_to_bound_literal(self):
+        compiled = str(_rank_type_expr("monthly").compile(dialect=postgresql.dialect()))
+        self.assertNotIn("literal(", compiled)
 
 
 if __name__ == "__main__":

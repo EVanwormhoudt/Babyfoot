@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import logging
 
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MISSED
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
@@ -17,7 +19,20 @@ from .jobs import (
 )
 from .settings import settings
 
-scheduler = BackgroundScheduler()
+logger = logging.getLogger(__name__)
+scheduler = BackgroundScheduler(timezone=settings.tz)
+
+
+def _log_scheduler_event(event) -> None:
+    if getattr(event, "exception", None) is not None:
+        logger.error("Scheduled job %s failed\n%s", event.job_id, event.traceback)
+        return
+
+    if event.code == EVENT_JOB_MISSED:
+        logger.warning("Scheduled job %s was missed", event.job_id)
+        return
+
+    logger.info("Scheduled job %s completed", event.job_id)
 
 
 
@@ -25,14 +40,31 @@ scheduler = BackgroundScheduler()
 async def lifespan(app: FastAPI):
     init_db()
     populate_if_empty()
-    scheduler.add_job(snapshot_overall_daily_if_changed, CronTrigger(hour=0, minute=5))
-    scheduler.add_job(snapshot_and_reset_monthly, CronTrigger(day="1", hour=0, minute=0))
-    scheduler.add_job(snapshot_and_reset_yearly, CronTrigger(month="1", day="1", hour=0, minute=0))
+    scheduler.add_listener(_log_scheduler_event, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED)
+    scheduler.add_job(
+        snapshot_overall_daily_if_changed,
+        CronTrigger(hour=0, minute=5, timezone=settings.tz),
+        id="snapshot_overall_daily_if_changed",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        snapshot_and_reset_monthly,
+        CronTrigger(day="1", hour=0, minute=0, timezone=settings.tz),
+        id="snapshot_and_reset_monthly",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        snapshot_and_reset_yearly,
+        CronTrigger(month="1", day="1", hour=0, minute=0, timezone=settings.tz),
+        id="snapshot_and_reset_yearly",
+        replace_existing=True,
+    )
     scheduler.start()
+    for job in scheduler.get_jobs():
+        logger.info("Scheduled job %s next run at %s", job.id, job.next_run_time)
     try:
         yield
     finally:
-        # ---- shutdown ----
         scheduler.shutdown(wait=False)
 
 
