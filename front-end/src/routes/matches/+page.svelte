@@ -8,6 +8,7 @@
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import { RangeCalendar } from '$lib/components/ui/range-calendar/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
+	import MatchRatingHoverPanel from '$lib/components/matches/MatchRatingHoverPanel.svelte';
 	import { deleteGame, updateGame } from '$lib/api/matches';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
@@ -292,8 +293,6 @@
 </script>
 
 <div class="mx-auto max-w-[1400px] space-y-6 px-4 py-4">
-
-
 	<section class="rounded-3xl bg-[hsl(var(--surface-container-low))] p-4 md:p-5">
 		<div class="flex flex-wrap items-center justify-between gap-3">
 			<p class="editorial-kicker">Filtres matchs</p>
@@ -353,7 +352,7 @@
 							{@const team1DeltaRows = teamDeltaRows(game, team1Players)}
 							{@const team2DeltaRows = teamDeltaRows(game, team2Players)}
 							<div
-								class="rounded-2xl border border-border/65 bg-card/90 px-4 py-4 transition hover:border-border/90"
+									class="group rounded-2xl border border-border/65 bg-card/90 px-4 py-4 transition hover:border-border/90"
 							>
 								<div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 									<div class="overflow-x-auto">
@@ -434,6 +433,14 @@
 										>
 											{deletingId === game.id ? 'Suppression...' : 'Supprimer'}
 										</Button>
+									</div>
+								</div>
+
+								<div
+										class="grid opacity-0 transition-all duration-200 ease-out [grid-template-rows:0fr] group-focus-within:opacity-100 group-focus-within:[grid-template-rows:1fr] group-hover:opacity-100 group-hover:[grid-template-rows:1fr] motion-reduce:transition-none"
+								>
+									<div class="overflow-hidden">
+										<MatchRatingHoverPanel {game} class="mt-4"/>
 									</div>
 								</div>
 							</div>
