@@ -11,6 +11,8 @@
 	import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 	import { getStoredCurrentPlayerId, onCurrentPlayerChange } from '$lib/current-player';
+	import { createGame, getGames } from '$lib/api/matches';
+	import type { GameRead, TeamRead } from '$lib/api/types';
 
 	type PlayerLite = {
 		id: number;
@@ -69,8 +71,8 @@
 					.map(normalizeItem)
 					.sort(sortByName)
 			},
-			{ id: COL_RED, name: 'Equipe rouge', class: 'team-red', items: [] },
-			{ id: COL_BLUE, name: 'Equipe bleue', class: 'team-blue', items: [] }
+			{ id: COL_RED, name: 'équipe rouge', class: 'team-red', items: [] },
+			{ id: COL_BLUE, name: 'équipe bleue', class: 'team-blue', items: [] }
 		];
 	}
 
@@ -176,6 +178,10 @@
 	// endpoint base (public, browser-safe)
 	const API_BASE = $derived((PUBLIC_API_BASE ?? '').replace(/\/$/, ''));
 	const GAMES_ENDPOINT = $derived(`${API_BASE}/api/games`);
+	const timeFormatter = new Intl.DateTimeFormat(undefined, {
+		hour: '2-digit',
+		minute: '2-digit'
+	});
 
 	let submitting = $state(false);
 	let lastGameId = $state<number | null>(null);
@@ -203,6 +209,73 @@
 		return fallback;
 	}
 
+	function buildTeamSignature(teams: Array<TeamCreatePayload | TeamRead>, teamNumber: 1 | 2): string {
+		return teams
+			.filter((team) => team.team_number === teamNumber)
+			.map((team) => team.player_id)
+			.sort((a, b) => a - b)
+			.join(',');
+	}
+
+	function isSimilarGame(payload: GameCreatePayload, game: GameRead): boolean {
+		const payloadTeam1 = buildTeamSignature(payload.teams, 1);
+		const payloadTeam2 = buildTeamSignature(payload.teams, 2);
+		const gameTeam1 = buildTeamSignature(game.teams, 1);
+		const gameTeam2 = buildTeamSignature(game.teams, 2);
+
+		const sameSides =
+			payload.result_team1 === game.result_team1 &&
+			payload.result_team2 === game.result_team2 &&
+			payloadTeam1 === gameTeam1 &&
+			payloadTeam2 === gameTeam2;
+
+		const swappedSides =
+			payload.result_team1 === game.result_team2 &&
+			payload.result_team2 === game.result_team1 &&
+			payloadTeam1 === gameTeam2 &&
+			payloadTeam2 === gameTeam1;
+
+		return sameSides || swappedSides;
+	}
+
+	function getTodayRange() {
+		const start = new Date();
+		start.setHours(0, 0, 0, 0);
+
+		const end = new Date(start);
+		end.setDate(end.getDate() + 1);
+		end.setMilliseconds(end.getMilliseconds() - 1);
+
+		return {
+			start_date: start.toISOString(),
+			end_date: end.toISOString()
+		};
+	}
+
+	function formatGameTime(gameTimestamp: string): string {
+		const date = new Date(gameTimestamp);
+		return Number.isNaN(date.getTime()) ? 'heure inconnue' : timeFormatter.format(date);
+	}
+
+	async function confirmSimilarGameCreation(payload: GameCreatePayload): Promise<boolean> {
+		const { start_date, end_date } = getTodayRange();
+		const { items } = await getGames({
+			limit: 200,
+			offset: 0,
+			start_date,
+			end_date
+		});
+		const similarGame = items.find((game) => isSimilarGame(payload, game));
+
+		if (!similarGame) {
+			return true;
+		}
+
+		return window.confirm(
+			`Un match similaire a déjà été crée aujourd'hui (match #${similarGame.id} a ${formatGameTime(similarGame.game_timestamp)}). Voulez-vous le créer quand meme ?`
+		);
+	}
+
 	async function undoLastSubmission() {
 		if (!lastGameId) {
 			toast.error('Annulation impossible (aucun identifiant de match).');
@@ -219,7 +292,7 @@
 
 		toast.promise(cancelPromise, {
 			loading: 'Annulation...',
-			success: 'Enregistrement annule.',
+			success: 'Enregistrement annulé.',
 			error: (e: unknown) => (e instanceof Error ? e.message : "Echec de l'annulation.")
 		});
 
@@ -273,22 +346,22 @@
 		const redCol = columnItems.find((c) => c.id === COL_RED);
 		const blueCol = columnItems.find((c) => c.id === COL_BLUE);
 		if (!redCol || !blueCol) {
-			toast.error('Les equipes ne sont pas initialisees.');
+			toast.error('Les équipes ne sont pas initialisees.');
 			return;
 		}
 
 		const redEmpty = redCol.items.length === 0;
 		const blueEmpty = blueCol.items.length === 0;
 		if (redEmpty && blueEmpty) {
-			toast.error('Les deux equipes sont vides. Ajoutez des joueurs en rouge et en bleu.');
+			toast.error('Les deux équipes sont vides. Ajoutez des joueurs en rouge et en bleu.');
 			return;
 		}
 		if (redEmpty) {
-			toast.error("L'equipe rouge est vide. Glissez un joueur ou utilisez les actions rapides.");
+			toast.error("L'équipe rouge est vide. Glissez un joueur ou utilisez les actions rapides.");
 			return;
 		}
 		if (blueEmpty) {
-			toast.error("L'equipe bleue est vide. Glissez un joueur ou utilisez les actions rapides.");
+			toast.error("L'équipe bleue est vide. Glissez un joueur ou utilisez les actions rapides.");
 			return;
 		}
 		if (r === b) {
@@ -308,18 +381,12 @@
 
 		submitting = true;
 		try {
-			const data = await (async () => {
-				const res = await fetch(GAMES_ENDPOINT, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(payload)
-				});
-				if (!res.ok) {
-					const msg = await readApiError(res, `La requete a echoue (${res.status})`);
-					throw new Error(msg);
-				}
-				return await res.json().catch(() => ({}));
-			})();
+			const confirmed = await confirmSimilarGameCreation(payload);
+			if (!confirmed) {
+				return;
+			}
+
+			const data = await createGame(payload);
 
 			// Show success with Undo action
 			lastGameId = Number.isFinite(Number(data?.id)) ? Number(data.id) : null;
@@ -347,12 +414,12 @@
 			></div>
 			<div class="relative flex flex-wrap items-center justify-between gap-3">
 				<div>
-					<Card.Title class="text-3xl font-black tracking-tight">Creer un match</Card.Title>
+					<Card.Title class="text-3xl font-black tracking-tight">Créer un match</Card.Title>
 					<Card.Description
-						>Glissez les joueurs dans les equipes rouge et bleue, puis validez le score.</Card.Description
+						>Glissez les joueurs dans les équipes rouge et bleue, puis validez le score.</Card.Description
 					>
 					<p class="mt-1 text-xs text-muted-foreground">
-						Astuce : vous pouvez aussi reordonner les joueurs a l'interieur d'une equipe.
+						Astuce : vous pouvez aussi reordonner les joueurs a l'interieur d'une équipe.
 					</p>
 				</div>
 				<div
@@ -424,7 +491,7 @@
 			<Card.Root class="create-card create-team create-team-red rounded-3xl">
 				<Card.Header class="pb-2">
 					<div class="flex items-center justify-between">
-						<Card.Title class="text-xl">Equipe rouge</Card.Title>
+						<Card.Title class="text-xl">équipe rouge</Card.Title>
 						<span class="tone-team-red rounded-full px-2.5 py-0.5 text-xs">
 							{column.items.length} joueurs
 						</span>
@@ -481,7 +548,7 @@
 		<Card.Root class="create-card create-score rounded-3xl">
 			<Card.Header>
 				<Card.Title class="text-xl">Valider le score</Card.Title>
-				<Card.Description>Entrez le score final des deux equipes.</Card.Description>
+				<Card.Description>Entrez le score final des deux équipes.</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<div class="grid grid-cols-[1fr_auto_1fr] items-end gap-4">
@@ -540,8 +607,8 @@
 						variant="outline"
 						onclick={resetMatchSetup}
 						disabled={submitting}
-						title="Reinitialiser les equipes et les scores"
-						aria-label="Reinitialiser les equipes et les scores"
+						title="Reinitialiser les équipes et les scores"
+						aria-label="Reinitialiser les équipes et les scores"
 					>
 						<RotateCcw />
 					</Button>
@@ -553,7 +620,7 @@
 			<Card.Root class="create-card create-team create-team-blue rounded-3xl">
 				<Card.Header class="pb-2">
 					<div class="flex items-center justify-between">
-						<Card.Title class="text-xl">Equipe bleue</Card.Title>
+						<Card.Title class="text-xl">équipe bleue</Card.Title>
 						<span class="tone-team-blue rounded-full px-2.5 py-0.5 text-xs">
 							{column.items.length} joueurs
 						</span>
