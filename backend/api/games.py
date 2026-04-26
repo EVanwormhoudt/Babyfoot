@@ -1,24 +1,21 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func, and_, or_
-from sqlalchemy.orm import selectinload
+from sqlalchemy import func, and_
+from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import Session, select
 
 from .db_errors import map_integrity_error
-from ..db.models import Game, Team, Player, GamePlayerRatingChange
+from ..db.models import Game, Team, Player, GamePlayerRatingChange, PlayerRatingHistory
 from ..db.session import get_session
-from ..consts import DEFAULT_RATING, DEFAULT_SIGMA
 from ..ranking import (
-    recalculate_all_ratings,
-    update_all_ratings,
-    snapshot_player_ratings,
+    calculate_game_rating_snapshots,
     build_game_rating_change_rows,
-    RATING_TYPES_ALL,
+    recalculate_all_ratings,
 )
 from ..schemas import GameCreate, GameRead, GameUpdate, GamesList
 from ..settings import settings
@@ -32,6 +29,49 @@ def _validate_score_bounds(score_team1: int, score_team2: int) -> None:
         raise HTTPException(422, "Les scores doivent etre positifs ou nuls")
     if score_team1 > 10 or score_team2 > 10:
         raise HTTPException(422, "Les scores doivent etre compris entre 0 et 10")
+
+
+def _same_day_base_snapshot(
+        session: Session,
+        players: list[Player],
+        rating_types: list[str],
+        day_ts: datetime,
+) -> dict[tuple[int, str], dict[str, float]]:
+    day_start = day_ts.replace(hour=0, minute=0, second=0, microsecond=0)
+    next_day = day_start + timedelta(days=1)
+    player_ids = [player.id for player in players]
+
+    delta_rows = session.exec(
+        select(
+            GamePlayerRatingChange.player_id,
+            GamePlayerRatingChange.rating_type,
+            func.coalesce(func.sum(GamePlayerRatingChange.delta_mu), 0.0).label("delta_mu"),
+        )
+        .join(Game, Game.id == GamePlayerRatingChange.game_id)
+        .where(
+            GamePlayerRatingChange.player_id.in_(player_ids),
+            GamePlayerRatingChange.rating_type.in_(rating_types),
+            Game.game_timestamp >= day_start,
+            Game.game_timestamp < next_day,
+        )
+        .group_by(GamePlayerRatingChange.player_id, GamePlayerRatingChange.rating_type)
+    ).all()
+
+    delta_by_key = {
+        (int(row.player_id), str(row.rating_type)): float(row.delta_mu or 0.0)
+        for row in delta_rows
+    }
+
+    snapshot: dict[tuple[int, str], dict[str, float]] = {}
+    for player in players:
+        if player.rating is None:
+            raise ValueError(f"Player {player.id} is missing a rating row")
+        for rating_type in rating_types:
+            snapshot[(player.id, rating_type)] = {
+                "mu": float(player.rating.get_mu(rating_type)) - delta_by_key.get((player.id, rating_type), 0.0),
+                "sigma": float(player.rating.get_sigma(rating_type)),
+            }
+    return snapshot
 
 
 @router.get("", response_model=GamesList)
@@ -95,10 +135,74 @@ def _validate_game_payload(payload: GameCreate, session: Session) -> Dict[int, P
     if not any(t.team_number == 1 for t in payload.teams) or not any(t.team_number == 2 for t in payload.teams):
         raise HTTPException(422, "Chaque equipe doit contenir au moins un joueur")
 
-    players = session.exec(
-        select(Player).where(Player.id.in_(ids)).options(selectinload(Player.rating))
+    latest_saved_rating = aliased(PlayerRatingHistory)
+    latest_saved_rating_sq = (
+        select(
+            PlayerRatingHistory.update_id.label("update_id"),
+            PlayerRatingHistory.player_id.label("player_id"),
+            PlayerRatingHistory.rank_type.label("rank_type"),
+            func.row_number().over(
+                partition_by=(PlayerRatingHistory.player_id, PlayerRatingHistory.rank_type),
+                order_by=(PlayerRatingHistory.date.desc(), PlayerRatingHistory.update_id.desc()),
+            ).label("rn"),
+        )
+        .where(
+            PlayerRatingHistory.player_id.in_(ids),
+            PlayerRatingHistory.rank_type.in_(("overall", "yearly", "monthly")),
+        )
+        .subquery()
+    )
+
+    rows = session.exec(
+        select(Player, latest_saved_rating)
+        .where(Player.id.in_(ids))
+        .options(selectinload(Player.rating))
+        .join(
+            latest_saved_rating_sq,
+            and_(
+                latest_saved_rating_sq.c.player_id == Player.id,
+                latest_saved_rating_sq.c.rn == 1,
+            ),
+            isouter=True,
+        )
+        .join(
+            latest_saved_rating,
+            latest_saved_rating.update_id == latest_saved_rating_sq.c.update_id,
+            isouter=True,
+        )
     ).all()
-    players_by_id = {p.id: p for p in players}
+
+    players_by_id: dict[int, Player] = {}
+    for player, latest_saved_row in rows:
+        existing = players_by_id.setdefault(player.id, player)
+        latest_saved_ratings = existing.__dict__.setdefault(
+            "latest_saved_ratings",
+            {
+                "overall": None,
+                "yearly": None,
+                "monthly": None,
+            },
+        )
+        if latest_saved_row is not None:
+            latest_saved_ratings[latest_saved_row.rank_type] = latest_saved_row
+
+    players = list(players_by_id.values())
+    for player in players:
+        latest_saved_ratings = player.__dict__.setdefault(
+            "latest_saved_ratings",
+            {
+                "overall": None,
+                "yearly": None,
+                "monthly": None,
+            },
+        )
+        # Keep backward compatibility with the previous one-row attribute.
+        player.__dict__["latest_saved_rating"] = latest_saved_ratings["overall"]
+        player.__dict__["latest_saved_rating_overall"] = latest_saved_ratings["overall"]
+        player.__dict__["latest_saved_rating_yearly"] = latest_saved_ratings["yearly"]
+        player.__dict__["latest_saved_rating_annual"] = latest_saved_ratings["yearly"]
+        player.__dict__["latest_saved_rating_monthly"] = latest_saved_ratings["monthly"]
+
     missing_ids = sorted(set(ids) - set(players_by_id))
     if missing_ids:
         raise HTTPException(422, f"player_id inconnu(s) : {missing_ids}")
@@ -130,19 +234,37 @@ def create_game(game: GameCreate, session: Session = Depends(get_session)):
 
         team1 = [players_by_id[t.player_id] for t in game.teams if t.team_number == 1]
         team2 = [players_by_id[t.player_id] for t in game.teams if t.team_number == 2]
-
         players_in_game = team1 + team2
-        before = snapshot_player_ratings(players_in_game, RATING_TYPES_ALL)
-        update_all_ratings(new_game, team1, team2)
-        after = snapshot_player_ratings(players_in_game, RATING_TYPES_ALL)
+        rating_types = ["overall", "yearly", "monthly"]
+        base_snapshot = _same_day_base_snapshot(session, players_in_game, rating_types, now)
+        before, after, resolved_rating_types, ts = calculate_game_rating_snapshots(
+            new_game,
+            team1,
+            team2,
+            rating_types=rating_types,
+            timestamp_tz=settings.tz,
+            rating_snapshot=base_snapshot,
+        )
+
         for row in build_game_rating_change_rows(
                 new_game.id,
                 players_in_game,
                 before,
                 after,
-                RATING_TYPES_ALL,
+                resolved_rating_types,
         ):
             session.add(row)
+
+        for player in players_in_game:
+            if player.rating is None:
+                raise ValueError(f"Player {player.id} is missing a rating row")
+            for rating_type in resolved_rating_types:
+                key = (player.id, rating_type)
+                delta_mu = after[key]["mu"] - before[key]["mu"]
+                player.rating.set_mu(rating_type, float(player.rating.get_mu(rating_type)) + delta_mu)
+                player.rating.set_sigma(rating_type, after[key]["sigma"])
+            player.rating.last_updated = ts
+
         session.commit()
 
         # Eager-load relationships so Pydantic can serialize after the transaction
@@ -215,76 +337,6 @@ def delete_game(game_id: int, session: Session = Depends(get_session)):
     ).first()
     if not g:
         raise HTTPException(404, "Match introuvable")
-
-    # Fast path: when deleting the latest game, restore impacted players from
-    # the stored per-game snapshots and avoid a full replay of history.
-    if g.rating_changes:
-        if g.game_timestamp is None:
-            newer_exists = session.exec(
-                select(Game.id).where(Game.id > g.id).limit(1)
-            ).first() is not None
-        else:
-            newer_exists = session.exec(
-                select(Game.id).where(
-                    or_(
-                        Game.game_timestamp > g.game_timestamp,
-                        and_(Game.game_timestamp == g.game_timestamp, Game.id > g.id),
-                    )
-                ).limit(1)
-            ).first() is not None
-
-        if not newer_exists:
-            player_ids = sorted({row.player_id for row in g.rating_changes})
-            players = session.exec(
-                select(Player)
-                .where(Player.id.in_(player_ids))
-                .options(selectinload(Player.rating))
-            ).all()
-            players_by_id = {p.id: p for p in players}
-
-            if all(players_by_id.get(pid) and players_by_id[pid].rating for pid in player_ids):
-                now = datetime.now(tz=settings.tz)
-                game_ts = g.game_timestamp
-                if game_ts is not None and game_ts.tzinfo is not None:
-                    game_ts = game_ts.astimezone(settings.tz)
-                elif game_ts is not None:
-                    game_ts = game_ts.replace(tzinfo=settings.tz)
-
-                try:
-                    for row in g.rating_changes:
-                        player = players_by_id[row.player_id]
-                        if row.rating_type == "yearly":
-                            if game_ts is None or game_ts.year != now.year:
-                                player.rating.set_mu(row.rating_type, DEFAULT_RATING)
-                                player.rating.set_sigma(row.rating_type, DEFAULT_SIGMA)
-                            else:
-                                player.rating.set_mu(row.rating_type, row.mu_before)
-                                player.rating.set_sigma(row.rating_type, row.sigma_before)
-                        elif row.rating_type == "monthly":
-                            if game_ts is None or (game_ts.year, game_ts.month) != (now.year, now.month):
-                                player.rating.set_mu(row.rating_type, DEFAULT_RATING)
-                                player.rating.set_sigma(row.rating_type, DEFAULT_SIGMA)
-                            else:
-                                player.rating.set_mu(row.rating_type, row.mu_before)
-                                player.rating.set_sigma(row.rating_type, row.sigma_before)
-                        else:
-                            player.rating.set_mu(row.rating_type, row.mu_before)
-                            player.rating.set_sigma(row.rating_type, row.sigma_before)
-                        player.rating.last_updated = now
-
-                    for row in g.rating_changes:
-                        session.delete(row)
-                    for team in g.teams:
-                        session.delete(team)
-                    session.delete(g)
-                    session.commit()
-                    return None
-                except IntegrityError as e:
-                    session.rollback()
-                    raise map_integrity_error(e, "Echec de suppression du match (contrainte base de donnees)")
-                except Exception as e:
-                    session.rollback()
-                    raise HTTPException(500, f"Echec de suppression du match : {e}")
 
     try:
         rating_changes = session.exec(

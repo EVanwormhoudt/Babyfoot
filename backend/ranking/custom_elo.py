@@ -15,13 +15,14 @@ if TYPE_CHECKING:
 
 RATING_TYPES_ALL = ["overall", "monthly", "yearly"]
 DEFAULT_TEAMMATE_ADVANTAGE = 0.0
+RatingSnapshot = Dict[tuple[int, str], Dict[str, float]]
 
 
 def snapshot_player_ratings(
         players: Sequence["Player"],
         rating_types: Sequence[str],
-) -> Dict[tuple[int, str], Dict[str, float]]:
-    snapshot: Dict[tuple[int, str], Dict[str, float]] = {}
+) -> RatingSnapshot:
+    snapshot: RatingSnapshot = {}
     for player in players:
         if player.rating is None:
             raise ValueError(f"Player {player.id} is missing a rating row")
@@ -31,6 +32,16 @@ def snapshot_player_ratings(
                 "sigma": float(player.rating.get_sigma(rating_type)),
             }
     return snapshot
+
+
+def _clone_rating_snapshot(snapshot: RatingSnapshot) -> RatingSnapshot:
+    return {
+        key: {
+            "mu": float(values["mu"]),
+            "sigma": float(values["sigma"]),
+        }
+        for key, values in snapshot.items()
+    }
 
 
 def build_game_rating_change_rows(
@@ -126,6 +137,97 @@ def _mov_multiplier(
     return 1.0 + (mov_top - 1.0) * curve
 
 
+def calculate_game_rating_snapshots(
+        game: "Game",
+        team1: Sequence["Player"],
+        team2: Sequence["Player"],
+        rating_types: Optional[List[str]] = None,
+        *,
+        mov_top: float = 2.0,
+        team_size_advantage: float = DEFAULT_TEAMMATE_ADVANTAGE,
+        timestamp_tz: _dt.tzinfo = _dt.timezone.utc,
+        rating_snapshot: Optional[RatingSnapshot] = None,
+) -> tuple[RatingSnapshot, RatingSnapshot, List[str], _dt.datetime]:
+    if not team1 or not team2:
+        raise ValueError("Both teams must be non-empty.")
+
+    ids1, ids2 = {p.id for p in team1}, {p.id for p in team2}
+    if ids1 & ids2:
+        raise ValueError("A player cannot be on both teams.")
+
+    now = _dt.datetime.now(timestamp_tz)
+    game_ts = _normalize_ts(getattr(game, "game_timestamp", None), timestamp_tz)
+
+    if rating_types is None:
+        rating_types = _rating_types_for_game(game_ts)
+
+    players_in_game = list(team1) + list(team2)
+    if rating_snapshot is None:
+        before = snapshot_player_ratings(players_in_game, rating_types)
+    else:
+        before: RatingSnapshot = {}
+        for player in players_in_game:
+            for rating_type in rating_types:
+                key = (player.id, rating_type)
+                values = rating_snapshot.get(key)
+                if values is None:
+                    raise ValueError(f"Missing rating snapshot for player {player.id} ({rating_type})")
+                before[key] = {
+                    "mu": float(values["mu"]),
+                    "sigma": float(values["sigma"]),
+                }
+
+    after = _clone_rating_snapshot(before)
+
+    if game.result_team1 > game.result_team2:
+        s1, s2 = 1.0, 0.0
+    elif game.result_team1 < game.result_team2:
+        s1, s2 = 0.0, 1.0
+    else:
+        s1 = s2 = 0.5
+
+    K = float(getattr(game, "K", None) or 16.0)
+    mov = _mov_multiplier(game.result_team1, game.result_team2, mov_top=mov_top)
+    ts = game_ts or now
+    team_scale = (len(team1) + len(team2)) / 2.0
+
+    for rating_type in rating_types:
+        def player_mu(player: "Player") -> float:
+            values = before.get((player.id, rating_type))
+            if values is None:
+                raise ValueError(f"Missing rating snapshot for player {player.id} ({rating_type})")
+            return float(values["mu"])
+
+        team1_rating = (
+                (sum(player_mu(p) for p in team1) / len(team1))
+                + _team_size_bonus(len(team1), team_size_advantage=team_size_advantage)
+        )
+        team2_rating = (
+                (sum(player_mu(p) for p in team2) / len(team2))
+                + _team_size_bonus(len(team2), team_size_advantage=team_size_advantage)
+        )
+
+        def expected(cur_rating: float, opp_rating: float) -> float:
+            return 1.0 / (1.0 + 10.0 ** ((opp_rating - cur_rating) / 400.0))
+
+        e1 = expected(team1_rating, team2_rating)
+        e2 = 1.0 - e1
+
+        delta_team1 = K * team_scale * mov * (s1 - e1)
+        delta_team2 = K * team_scale * mov * (s2 - e2)
+
+        split1 = delta_team1 / len(team1)
+        split2 = delta_team2 / len(team2)
+
+        for player in team1:
+            after[(player.id, rating_type)]["mu"] = before[(player.id, rating_type)]["mu"] + split1
+
+        for player in team2:
+            after[(player.id, rating_type)]["mu"] = before[(player.id, rating_type)]["mu"] + split2
+
+    return before, after, rating_types, ts
+
+
 def update_all_ratings(
         game: "Game",
         team1: Sequence["Player"],
@@ -152,34 +254,6 @@ def update_all_ratings(
     if ids1 & ids2:
         raise ValueError("A player cannot be on both teams.")
 
-    now = _dt.datetime.now(timestamp_tz)
-    game_ts = _normalize_ts(getattr(game, "game_timestamp", None), timestamp_tz)
-
-    if rating_types is None:
-        rating_types = _rating_types_for_game(game_ts)
-
-    if game.result_team1 > game.result_team2:
-        s1, s2 = 1.0, 0.0
-    elif game.result_team1 < game.result_team2:
-        s1, s2 = 0.0, 1.0
-    else:
-        s1 = s2 = 0.5
-
-    K = float(getattr(game, "K", None) or 16.0)
-    mov = _mov_multiplier(game.result_team1, game.result_team2, mov_top=mov_top)
-    ts = game_ts or now
-    team_scale = (len(team1) + len(team2)) / 2.0
-
-    def _getter(obj: Any, base: str) -> Callable[[str], float]:
-        method = getattr(obj, f"get_{base}", None)
-        if callable(method):
-            return lambda rt: float(method(rt))
-
-        def _get(rt: str) -> float:
-            return float(getattr(obj, f"{base}_{rt}"))
-
-        return _get
-
     def _setter(obj: Any, base: str) -> Callable[[str, float], None]:
         method = getattr(obj, f"set_{base}", None)
         if callable(method):
@@ -190,48 +264,26 @@ def update_all_ratings(
 
         return _set
 
-    for rating_type in rating_types:
-        def player_mu(player: "Player") -> float:
-            if player.rating is None:
-                raise ValueError(f"Player {player.id} is missing a rating row")
-            return _getter(player.rating, "mu")(rating_type)
+    _, after, resolved_rating_types, ts = calculate_game_rating_snapshots(
+        game,
+        team1,
+        team2,
+        rating_types=rating_types,
+        mov_top=mov_top,
+        team_size_advantage=team_size_advantage,
+        timestamp_tz=timestamp_tz,
+    )
 
-        team1_rating = (
-                (sum(player_mu(p) for p in team1) / len(team1))
-                + _team_size_bonus(len(team1), team_size_advantage=team_size_advantage)
-        )
-        team2_rating = (
-                (sum(player_mu(p) for p in team2) / len(team2))
-                + _team_size_bonus(len(team2), team_size_advantage=team_size_advantage)
-        )
-
-        def expected(cur_rating: float, opp_rating: float) -> float:
-            return 1.0 / (1.0 + 10.0 ** ((opp_rating - cur_rating) / 400.0))
-
-        e1 = expected(team1_rating, team2_rating)
-        e2 = 1.0 - e1
-
-        delta_team1 = K * team_scale * mov * (s1 - e1)
-        delta_team2 = K * team_scale * mov * (s2 - e2)
-
-        split1 = delta_team1 / len(team1)
-        split2 = delta_team2 / len(team2)
-
-        for player in team1:
-            if player.rating is None:
-                raise ValueError(f"Player {player.id} is missing a rating row")
-            get_mu = _getter(player.rating, "mu")
-            set_mu = _setter(player.rating, "mu")
-            set_mu(rating_type, get_mu(rating_type) + split1)
-            setattr(player.rating, "last_updated", ts)
-
-        for player in team2:
-            if player.rating is None:
-                raise ValueError(f"Player {player.id} is missing a rating row")
-            get_mu = _getter(player.rating, "mu")
-            set_mu = _setter(player.rating, "mu")
-            set_mu(rating_type, get_mu(rating_type) + split2)
-            setattr(player.rating, "last_updated", ts)
+    for player in list(team1) + list(team2):
+        if player.rating is None:
+            raise ValueError(f"Player {player.id} is missing a rating row")
+        set_mu = _setter(player.rating, "mu")
+        set_sigma = _setter(player.rating, "sigma")
+        for rating_type in resolved_rating_types:
+            values = after[(player.id, rating_type)]
+            set_mu(rating_type, values["mu"])
+            set_sigma(rating_type, values["sigma"])
+        setattr(player.rating, "last_updated", ts)
 
 
 def recalculate_all_ratings(session: "Session") -> None:
@@ -284,6 +336,10 @@ def recalculate_all_ratings(session: "Session") -> None:
 
     active_month_key: Optional[tuple[int, int]] = None
     active_year: Optional[int] = None
+    current_day: object | _dt.date | None = object()
+    day_base_snapshot: Optional[RatingSnapshot] = None
+    day_running_snapshot: Optional[RatingSnapshot] = None
+    last_updated_by_player: Dict[int, _dt.datetime] = {}
 
     def _reset_monthly() -> None:
         for player in players:
@@ -298,6 +354,19 @@ def recalculate_all_ratings(session: "Session") -> None:
                 continue
             player.rating.mu_yearly = DEFAULT_RATING
             player.rating.sigma_yearly = DEFAULT_SIGMA
+
+    def _finalize_day() -> None:
+        if day_running_snapshot is None:
+            return
+        for player in players:
+            if player.rating is None:
+                raise ValueError(f"Player {player.id} is missing a rating row")
+            for rating_type in RATING_TYPES_ALL:
+                values = day_running_snapshot[(player.id, rating_type)]
+                player.rating.set_mu(rating_type, values["mu"])
+                player.rating.set_sigma(rating_type, values["sigma"])
+            if player.id in last_updated_by_player:
+                player.rating.last_updated = last_updated_by_player[player.id]
 
     for game in games:
         team1: list[Player] = []
@@ -319,40 +388,59 @@ def recalculate_all_ratings(session: "Session") -> None:
             raise ValueError(f"Game {game.id} must have players on both teams")
 
         game_ts = _normalize_ts(game.game_timestamp, settings.tz)
-        if game_ts is not None:
-            month_key = (game_ts.year, game_ts.month)
-            if active_month_key is not None and month_key != active_month_key:
-                _reset_monthly()
+        day_key = game_ts.date() if game_ts is not None else None
+        if day_base_snapshot is None or day_key != current_day:
+            _finalize_day()
+            if game_ts is not None:
+                month_key = (game_ts.year, game_ts.month)
+                if active_month_key is not None and month_key != active_month_key:
+                    _reset_monthly()
 
-            if active_year is not None and game_ts.year != active_year:
-                _reset_yearly()
+                if active_year is not None and game_ts.year != active_year:
+                    _reset_yearly()
 
-            active_month_key = month_key
-            active_year = game_ts.year
+                active_month_key = month_key
+                active_year = game_ts.year
+
+            current_day = day_key
+            day_base_snapshot = snapshot_player_ratings(players, RATING_TYPES_ALL)
+            day_running_snapshot = _clone_rating_snapshot(day_base_snapshot)
 
         rating_types = _rating_types_for_game(game_ts)
 
         players_in_game = team1 + team2
-        before = snapshot_player_ratings(players_in_game, rating_types)
-
-        update_all_ratings(
+        before, after, resolved_rating_types, ts = calculate_game_rating_snapshots(
             game,
             team1,
             team2,
             rating_types=rating_types,
             timestamp_tz=settings.tz,
+            rating_snapshot=day_base_snapshot,
         )
-
-        after = snapshot_player_ratings(players_in_game, rating_types)
 
         for row in build_game_rating_change_rows(
                 game.id,
                 players_in_game,
                 before,
                 after,
-                rating_types,
+                resolved_rating_types,
         ):
             session.add(row)
+
+        if day_running_snapshot is None:
+            raise ValueError("Daily replay snapshot was not initialized")
+
+        for player in players_in_game:
+            for rating_type in resolved_rating_types:
+                key = (player.id, rating_type)
+                day_running_snapshot[key]["mu"] += after[key]["mu"] - before[key]["mu"]
+                day_running_snapshot[key]["sigma"] = after[key]["sigma"]
+            if player.rating is None:
+                raise ValueError(f"Player {player.id} is missing a rating row")
+            player.rating.last_updated = ts
+            last_updated_by_player[player.id] = ts
+
+    _finalize_day()
 
     # Keep current-period rank semantics consistent when there is no game in
     # the active month/year.

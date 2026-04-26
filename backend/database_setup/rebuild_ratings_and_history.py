@@ -21,8 +21,8 @@ from backend.db.session import engine
 from backend.ranking.custom_elo import (
     RATING_TYPES_ALL,
     build_game_rating_change_rows,
+    calculate_game_rating_snapshots,
     snapshot_player_ratings,
-    update_all_ratings,
 )
 from backend.settings import settings
 
@@ -123,7 +123,10 @@ def rebuild_all_ratings_and_history(session: Session) -> RebuildStats:
     active_month_key: tuple[int, int] | None = None
     active_year: int | None = None
     last_date_in_active_month: dt.date | None = None
-    current_day: dt.date | None = None
+    current_day: object | dt.date | None = object()
+    day_base_snapshot: Dict[tuple[int, str], Dict[str, float]] | None = None
+    day_running_snapshot: Dict[tuple[int, str], Dict[str, float]] | None = None
+    last_updated_by_player: Dict[int, dt.datetime] = {}
     previous_overall_snapshot: Dict[int, tuple[float, float]] = {}
 
     def snapshot_daily_overall_if_changed(snapshot_date: dt.date) -> None:
@@ -180,24 +183,42 @@ def rebuild_all_ratings_and_history(session: Session) -> RebuildStats:
             p.rating.mu_yearly = DEFAULT_RATING
             p.rating.sigma_yearly = DEFAULT_SIGMA
 
+    def finalize_day() -> None:
+        nonlocal day_running_snapshot
+        if day_running_snapshot is None:
+            return
+        for p in players:
+            for rating_type in RATING_TYPES_ALL:
+                values = day_running_snapshot[(p.id, rating_type)]
+                p.rating.set_mu(rating_type, values["mu"])
+                p.rating.set_sigma(rating_type, values["sigma"])
+            if p.id in last_updated_by_player:
+                p.rating.last_updated = last_updated_by_player[p.id]
+
     for game in games:
         game_ts = _normalize_game_timestamp(game)
         game_date = game_ts.date()
         month_key = (game_date.year, game_date.month)
         year = game_date.year
 
-        if current_day is None:
-            current_day = game_date
-        elif game_date != current_day:
-            snapshot_daily_overall_if_changed(current_day)
-            current_day = game_date
+        if day_base_snapshot is None or game_date != current_day:
+            if day_base_snapshot is not None and current_day is not None:
+                finalize_day()
+                snapshot_daily_overall_if_changed(current_day)
 
-        if active_month_key is not None and month_key != active_month_key:
-            snapshot_monthly_and_yearly(last_date_in_active_month)
-            reset_monthly()
+            if active_month_key is not None and month_key != active_month_key:
+                snapshot_monthly_and_yearly(last_date_in_active_month)
+                reset_monthly()
 
-        if active_year is not None and year != active_year:
-            reset_yearly()
+            if active_year is not None and year != active_year:
+                reset_yearly()
+
+            current_day = game_date
+            day_base_snapshot = snapshot_player_ratings(players, RATING_TYPES_ALL)
+            day_running_snapshot = {
+                key: {"mu": float(values["mu"]), "sigma": float(values["sigma"])}
+                for key, values in day_base_snapshot.items()
+            }
 
         active_month_key = month_key
         active_year = year
@@ -219,28 +240,38 @@ def rebuild_all_ratings_and_history(session: Session) -> RebuildStats:
             continue
 
         players_in_game = team1 + team2
-        before = snapshot_player_ratings(players_in_game, RATING_TYPES_ALL)
-        update_all_ratings(
+        before, after, resolved_rating_types, ts = calculate_game_rating_snapshots(
             game,
             team1,
             team2,
             rating_types=RATING_TYPES_ALL,
             timestamp_tz=settings.tz,
+            rating_snapshot=day_base_snapshot,
         )
-        after = snapshot_player_ratings(players_in_game, RATING_TYPES_ALL)
 
         rows = build_game_rating_change_rows(
             game.id,
             players_in_game,
             before,
             after,
-            RATING_TYPES_ALL,
+            resolved_rating_types,
         )
         for row in rows:
             session.add(row)
         stats.game_rating_changes += len(rows)
 
-    if current_day is not None:
+        if day_running_snapshot is None:
+            raise ValueError("Daily replay snapshot was not initialized")
+
+        for player in players_in_game:
+            for rating_type in resolved_rating_types:
+                key = (player.id, rating_type)
+                day_running_snapshot[key]["mu"] += after[key]["mu"] - before[key]["mu"]
+                day_running_snapshot[key]["sigma"] = after[key]["sigma"]
+            last_updated_by_player[player.id] = ts
+
+    if current_day is not None and day_base_snapshot is not None:
+        finalize_day()
         snapshot_daily_overall_if_changed(current_day)
 
     if active_month_key is not None and last_date_in_active_month is not None:
