@@ -178,13 +178,17 @@
 	// endpoint base (public, browser-safe)
 	const API_BASE = $derived((PUBLIC_API_BASE ?? '').replace(/\/$/, ''));
 	const GAMES_ENDPOINT = $derived(`${API_BASE}/api/games`);
-	const timeFormatter = new Intl.DateTimeFormat(undefined, {
+	const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+		day: '2-digit',
+		month: 'long',
 		hour: '2-digit',
 		minute: '2-digit'
 	});
 
 	let submitting = $state(false);
 	let lastGameId = $state<number | null>(null);
+	let pendingSimilarGame = $state<GameRead | null>(null);
+	let similarGameResolver: ((confirmed: boolean) => void) | null = null;
 
 	onMount(() => {
 		currentPlayerId = getStoredCurrentPlayerId();
@@ -209,7 +213,10 @@
 		return fallback;
 	}
 
-	function buildTeamSignature(teams: Array<TeamCreatePayload | TeamRead>, teamNumber: 1 | 2): string {
+	function buildTeamSignature(
+		teams: Array<TeamCreatePayload | TeamRead>,
+		teamNumber: 1 | 2
+	): string {
 		return teams
 			.filter((team) => team.team_number === teamNumber)
 			.map((team) => team.player_id)
@@ -252,9 +259,23 @@
 		};
 	}
 
-	function formatGameTime(gameTimestamp: string): string {
+	function formatGameDateTime(gameTimestamp: string): string {
 		const date = new Date(gameTimestamp);
-		return Number.isNaN(date.getTime()) ? 'heure inconnue' : timeFormatter.format(date);
+		return Number.isNaN(date.getTime()) ? 'horaire inconnu' : dateTimeFormatter.format(date);
+	}
+
+	function promptSimilarGameCreation(similarGame: GameRead): Promise<boolean> {
+		pendingSimilarGame = similarGame;
+		return new Promise((resolve) => {
+			similarGameResolver = resolve;
+		});
+	}
+
+	function respondToSimilarGamePrompt(confirmed: boolean) {
+		const resolver = similarGameResolver;
+		similarGameResolver = null;
+		pendingSimilarGame = null;
+		resolver?.(confirmed);
 	}
 
 	async function confirmSimilarGameCreation(payload: GameCreatePayload): Promise<boolean> {
@@ -271,9 +292,7 @@
 			return true;
 		}
 
-		return window.confirm(
-			`Un match similaire a déjà été crée aujourd'hui (match #${similarGame.id} a ${formatGameTime(similarGame.game_timestamp)}). Voulez-vous le créer quand meme ?`
-		);
+		return promptSimilarGameCreation(similarGame);
 	}
 
 	async function undoLastSubmission() {
@@ -675,6 +694,70 @@
 		{/each}
 	</div>
 </div>
+
+{#if pendingSimilarGame}
+	<div class="fixed inset-0 z-50 grid items-start justify-items-center p-4 pt-[18vh]">
+		<button
+			type="button"
+			class="absolute inset-0 bg-black/45 backdrop-blur-[1px]"
+			aria-label="Fermer la confirmation de doublon"
+			onclick={() => respondToSimilarGamePrompt(false)}
+		></button>
+
+		<div
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="similar-game-title"
+			tabindex="-1"
+			class="relative w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-[0_22px_50px_rgba(0,0,0,0.35)]"
+			onkeydown={(event) => {
+				if (event.key === 'Escape') {
+					event.preventDefault();
+					respondToSimilarGamePrompt(false);
+				}
+			}}
+		>
+			<div class="mb-4 flex items-start justify-between gap-3">
+				<div>
+					<h3 id="similar-game-title" class="text-base font-semibold">Match similaire detecte</h3>
+					<p class="text-xs text-muted-foreground">Un match proche existe deja aujourd'hui.</p>
+				</div>
+
+				<button
+					type="button"
+					class="rounded-lg p-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+					aria-label="Fermer"
+					onclick={() => respondToSimilarGamePrompt(false)}
+				>
+					✕
+				</button>
+			</div>
+
+			<div class="space-y-3">
+				<div class="rounded-xl border border-border/70 bg-[hsl(var(--surface-container-low))] p-3">
+					<p class="text-sm font-semibold text-foreground">Match #{pendingSimilarGame.id}</p>
+					<p class="mt-1 text-xs text-muted-foreground">
+						{formatGameDateTime(pendingSimilarGame.game_timestamp)}
+					</p>
+					<p class="mt-2 text-sm text-foreground/90">
+						Score : {pendingSimilarGame.result_team1} - {pendingSimilarGame.result_team2}
+					</p>
+				</div>
+
+				<p class="text-sm text-foreground/90">Voulez-vous quand meme creer ce match ?</p>
+			</div>
+
+			<div class="mt-5 flex items-center justify-end gap-2">
+				<Button type="button" variant="ghost" onclick={() => respondToSimilarGamePrompt(false)}>
+					Annuler
+				</Button>
+				<Button type="button" onclick={() => respondToSimilarGamePrompt(true)}>
+					Creer quand meme
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.create-match {
