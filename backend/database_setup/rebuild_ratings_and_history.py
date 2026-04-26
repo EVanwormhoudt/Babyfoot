@@ -38,6 +38,17 @@ class RebuildStats:
     history_yearly_rows: int = 0
 
 
+def _next_month_start(month_key: tuple[int, int]) -> dt.date:
+    year, month = month_key
+    if month == 12:
+        return dt.date(year + 1, 1, 1)
+    return dt.date(year, month + 1, 1)
+
+
+def _next_year_start(year: int) -> dt.date:
+    return dt.date(year + 1, 1, 1)
+
+
 def _normalize_game_timestamp(game: Game) -> dt.datetime:
     ts = game.game_timestamp
     if ts is None:
@@ -127,14 +138,19 @@ def rebuild_all_ratings_and_history(session: Session) -> RebuildStats:
     day_base_snapshot: Dict[tuple[int, str], Dict[str, float]] | None = None
     day_running_snapshot: Dict[tuple[int, str], Dict[str, float]] | None = None
     last_updated_by_player: Dict[int, dt.datetime] = {}
-    previous_overall_snapshot: Dict[int, tuple[float, float]] = {}
+    previous_snapshots: Dict[str, Dict[int, tuple[float, float]]] = {
+        "overall": {},
+        "monthly": {},
+        "yearly": {},
+    }
 
-    def snapshot_daily_overall_if_changed(snapshot_date: dt.date) -> None:
-        ranks = _compute_dense_ranks(players, "overall")
+    def snapshot_daily_if_changed(snapshot_date: dt.date, rating_type: str) -> None:
+        ranks = _compute_dense_ranks(players, rating_type)
+        previous_snapshot = previous_snapshots[rating_type]
         for p in players:
-            mu = float(p.rating.get_mu("overall"))
-            sigma = float(p.rating.get_sigma("overall"))
-            prev = previous_overall_snapshot.get(p.id)
+            mu = float(p.rating.get_mu(rating_type))
+            sigma = float(p.rating.get_sigma(rating_type))
+            prev = previous_snapshot.get(p.id)
             changed = prev is None or abs(mu - prev[0]) > 1e-9 or abs(sigma - prev[1]) > 1e-9
             if not changed:
                 continue
@@ -146,32 +162,21 @@ def rebuild_all_ratings_and_history(session: Session) -> RebuildStats:
                     sigma=sigma,
                     date=snapshot_date,
                     rank=ranks[p.id],
-                    rank_type="overall",
+                    rank_type=rating_type,
                 )
             )
-            previous_overall_snapshot[p.id] = (mu, sigma)
+            previous_snapshot[p.id] = (mu, sigma)
             stats.history_rows += 1
-            stats.history_overall_rows += 1
+            if rating_type == "overall":
+                stats.history_overall_rows += 1
+            elif rating_type == "monthly":
+                stats.history_monthly_rows += 1
+            else:
+                stats.history_yearly_rows += 1
 
-    def snapshot_monthly_and_yearly(snapshot_date: dt.date) -> None:
-        for rating_type in ("monthly", "yearly"):
-            ranks = _compute_dense_ranks(players, rating_type)
-            for p in players:
-                session.add(
-                    PlayerRatingHistory(
-                        player_id=p.id,
-                        mu=float(p.rating.get_mu(rating_type)),
-                        sigma=float(p.rating.get_sigma(rating_type)),
-                        date=snapshot_date,
-                        rank=ranks[p.id],
-                        rank_type=rating_type,
-                    )
-                )
-                stats.history_rows += 1
-                if rating_type == "monthly":
-                    stats.history_monthly_rows += 1
-                else:
-                    stats.history_yearly_rows += 1
+    def snapshot_all_daily_if_changed(snapshot_date: dt.date) -> None:
+        for rating_type in ("overall", "monthly", "yearly"):
+            snapshot_daily_if_changed(snapshot_date, rating_type)
 
     def reset_monthly() -> None:
         for p in players:
@@ -204,14 +209,19 @@ def rebuild_all_ratings_and_history(session: Session) -> RebuildStats:
         if day_base_snapshot is None or game_date != current_day:
             if day_base_snapshot is not None and current_day is not None:
                 finalize_day()
-                snapshot_daily_overall_if_changed(current_day)
+                snapshot_all_daily_if_changed(current_day)
 
             if active_month_key is not None and month_key != active_month_key:
-                snapshot_monthly_and_yearly(last_date_in_active_month)
                 reset_monthly()
+                monthly_reset_date = _next_month_start(active_month_key)
+                if monthly_reset_date < game_date:
+                    snapshot_daily_if_changed(monthly_reset_date, "monthly")
 
             if active_year is not None and year != active_year:
                 reset_yearly()
+                yearly_reset_date = _next_year_start(active_year)
+                if yearly_reset_date < game_date:
+                    snapshot_daily_if_changed(yearly_reset_date, "yearly")
 
             current_day = game_date
             day_base_snapshot = snapshot_player_ratings(players, RATING_TYPES_ALL)
@@ -272,10 +282,7 @@ def rebuild_all_ratings_and_history(session: Session) -> RebuildStats:
 
     if current_day is not None and day_base_snapshot is not None:
         finalize_day()
-        snapshot_daily_overall_if_changed(current_day)
-
-    if active_month_key is not None and last_date_in_active_month is not None:
-        snapshot_monthly_and_yearly(last_date_in_active_month)
+        snapshot_all_daily_if_changed(current_day)
 
     return stats
 

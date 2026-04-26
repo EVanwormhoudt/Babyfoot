@@ -13,9 +13,7 @@ from .api import router as api_router
 from .database_setup.seed_if_empty import populate_if_empty
 from .db.session import init_db
 from .jobs import (
-    snapshot_and_reset_monthly,
-    snapshot_and_reset_yearly,
-    snapshot_overall_daily_if_changed,
+    snapshot_daily_ratings_and_roll_periods,
 )
 from .settings import settings
 
@@ -42,21 +40,9 @@ async def lifespan(app: FastAPI):
     populate_if_empty()
     scheduler.add_listener(_log_scheduler_event, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED)
     scheduler.add_job(
-        snapshot_overall_daily_if_changed,
+        snapshot_daily_ratings_and_roll_periods,
         CronTrigger(hour=0, minute=5, timezone=settings.tz),
-        id="snapshot_overall_daily_if_changed",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        snapshot_and_reset_monthly,
-        CronTrigger(day="1", hour=0, minute=0, timezone=settings.tz),
-        id="snapshot_and_reset_monthly",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        snapshot_and_reset_yearly,
-        CronTrigger(month="1", day="1", hour=0, minute=0, timezone=settings.tz),
-        id="snapshot_and_reset_yearly",
+        id="snapshot_daily_ratings_and_roll_periods",
         replace_existing=True,
     )
     scheduler.start()

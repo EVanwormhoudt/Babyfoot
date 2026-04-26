@@ -5,13 +5,17 @@ try:
     from sqlalchemy.dialects import postgresql
 
     from backend.jobs import (
+        _build_daily_snapshot_rows,
         _build_daily_overall_snapshot_rows,
+        _has_snapshot_changed,
         _has_overall_snapshot_changed,
         _rank_type_expr,
         _snapshot_date_expr,
     )
 except ModuleNotFoundError:
+    _build_daily_snapshot_rows = None
     _build_daily_overall_snapshot_rows = None
+    _has_snapshot_changed = None
     _has_overall_snapshot_changed = None
     _rank_type_expr = None
     _snapshot_date_expr = None
@@ -23,6 +27,11 @@ except ModuleNotFoundError:
 )
 class DailyOverallSnapshotTests(unittest.TestCase):
     def test_change_detector(self):
+        self.assertFalse(_has_snapshot_changed(1000.0, 400.0, 1000.0, 400.0))
+        self.assertTrue(_has_snapshot_changed(1000.1, 400.0, 1000.0, 400.0))
+        self.assertTrue(_has_snapshot_changed(1000.0, 399.9, 1000.0, 400.0))
+        self.assertTrue(_has_snapshot_changed(1000.0, 400.0, None, None))
+
         self.assertFalse(_has_overall_snapshot_changed(1000.0, 400.0, 1000.0, 400.0))
         self.assertTrue(_has_overall_snapshot_changed(1000.1, 400.0, 1000.0, 400.0))
         self.assertTrue(_has_overall_snapshot_changed(1000.0, 399.9, 1000.0, 400.0))
@@ -52,6 +61,29 @@ class DailyOverallSnapshotTests(unittest.TestCase):
         for row in rows:
             self.assertEqual(row["rank_type"], "overall")
             self.assertEqual(row["date"], snapshot_date)
+
+    def test_build_daily_rows_only_for_changed_players_for_monthly(self):
+        snapshot_date = dt.date(2026, 4, 2)
+        candidates = [
+            {"player_id": 1, "mu": 1012.0, "sigma": 400.0, "rank": 1},
+            {"player_id": 2, "mu": 1000.0, "sigma": 400.0, "rank": 2},
+        ]
+        latest = {
+            1: (1012.0, 400.0),
+            2: (999.0, 400.0),
+        }
+
+        rows = _build_daily_snapshot_rows(
+            candidates=candidates,
+            latest_by_player=latest,
+            snapshot_date=snapshot_date,
+            rank_type="monthly",
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(int(rows[0]["player_id"]), 2)
+        self.assertEqual(rows[0]["rank_type"], "monthly")
+        self.assertEqual(rows[0]["date"], snapshot_date)
 
     def test_snapshot_date_expr_compiles_to_bound_date_literal(self):
         compiled = str(_snapshot_date_expr(dt.date(2026, 3, 28)).compile(dialect=postgresql.dialect()))
