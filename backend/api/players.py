@@ -13,6 +13,7 @@ from .db_errors import map_integrity_error
 from ..consts import DEFAULT_RATING, DEFAULT_SIGMA
 from ..db.models import Player, CurrentPlayerRank, Team, Game, PlayerRatingHistory
 from ..db.session import get_session
+from ..period_rollover import ensure_current_period_ratings
 from ..schemas import (
     PlayerCreate,
     PlayerRead,
@@ -23,6 +24,11 @@ from ..schemas import (
 from ..settings import settings
 
 router = APIRouter()
+
+
+def _sync_current_period_ratings(session: Session) -> None:
+    if ensure_current_period_ratings(session):
+        session.commit()
 
 
 @router.get("/leaderboard", response_model=List[PlayerLeaderboard])
@@ -86,6 +92,8 @@ def get_leaderboard(
 
     # 4) Load players with the correct rating snapshot
     use_live = is_current_period(leaderboard_type, start_dt, end_dt)
+    if use_live:
+        _sync_current_period_ratings(session)
 
     if use_live or leaderboard_type == "overall":
         # Live / overall: use CurrentPlayerRank relationship
@@ -206,6 +214,7 @@ def list_players(
         offset: int = Query(0, ge=0),
         session: Session = Depends(get_session),
 ):
+    _sync_current_period_ratings(session)
     q = (
         select(Player)
         .options(selectinload(Player.rating))
@@ -217,6 +226,7 @@ def list_players(
 
 @router.get("/{player_id}", response_model=PlayerRead)
 def get_player(player_id: int, session: Session = Depends(get_session)):
+    _sync_current_period_ratings(session)
     player = session.exec(
         select(Player).where(Player.id == player_id).options(selectinload(Player.rating))
     ).first()

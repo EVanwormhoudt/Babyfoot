@@ -7,14 +7,16 @@ from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MI
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
+from sqlmodel import Session
 from starlette.middleware.cors import CORSMiddleware
 
 from .api import router as api_router
 from .database_setup.seed_if_empty import populate_if_empty
-from .db.session import init_db
+from .db.session import engine, init_db
 from .jobs import (
     snapshot_daily_ratings_and_roll_periods,
 )
+from .period_rollover import ensure_current_period_ratings
 from .settings import settings
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,9 @@ def _log_scheduler_event(event) -> None:
 async def lifespan(app: FastAPI):
     init_db()
     populate_if_empty()
+    with Session(engine) as session:
+        if ensure_current_period_ratings(session):
+            session.commit()
     scheduler.add_listener(_log_scheduler_event, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED)
     scheduler.add_job(
         snapshot_daily_ratings_and_roll_periods,

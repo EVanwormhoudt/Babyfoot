@@ -12,6 +12,7 @@ from sqlmodel import Session, select
 from .db_errors import map_integrity_error
 from ..db.models import Game, Team, Player, GamePlayerRatingChange, PlayerRatingHistory
 from ..db.session import get_session
+from ..period_rollover import ensure_current_period_ratings
 from ..ranking import (
     calculate_game_rating_snapshots,
     build_game_rating_change_rows,
@@ -216,6 +217,8 @@ def _validate_game_payload(payload: GameCreate, session: Session) -> Dict[int, P
 
 @router.post("", response_model=GameRead, status_code=201)
 def create_game(game: GameCreate, session: Session = Depends(get_session)):
+    if ensure_current_period_ratings(session):
+        session.commit()
     players_by_id = _validate_game_payload(game, session)
 
     now = datetime.now(tz=settings.tz)
