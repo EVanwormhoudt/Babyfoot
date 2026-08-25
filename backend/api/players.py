@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Literal, Optional, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 from sqlalchemy import func, case, and_
@@ -14,6 +14,7 @@ from ..consts import DEFAULT_RATING, DEFAULT_SIGMA
 from ..db.models import Player, CurrentPlayerRank, Team, Game, PlayerRatingHistory
 from ..db.session import get_session
 from ..period_rollover import ensure_current_period_ratings
+from ..privacy import can_see_names, serialize_leaderboard_row, serialize_player, serialize_players
 from ..schemas import (
     PlayerCreate,
     PlayerRead,
@@ -33,6 +34,7 @@ def _sync_current_period_ratings(session: Session) -> None:
 
 @router.get("/leaderboard", response_model=List[PlayerLeaderboard])
 def get_leaderboard(
+        request: Request,
         leaderboard_type: Literal["monthly", "yearly", "overall"] = Query("monthly"),
         year: Optional[int] = Query(
             None,
@@ -151,12 +153,14 @@ def get_leaderboard(
 
     # 6) Build response rows with wins/losses injected
     result: List[PlayerLeaderboard] = []
+    show_names = can_see_names(request)
     for p, hist in rows:
         stats = per_player_stats.get(p.id, {"wins": 0, "losses": 0})
         mu_val = mu_for((p, hist))
         result.append(
-            PlayerLeaderboard(
-                **p.model_dump(),
+            serialize_leaderboard_row(
+                p,
+                show_names=show_names,
                 rating=p.rating if (use_live or leaderboard_type == "overall") else None,
                 mu=mu_val,
                 wins=stats["wins"],
@@ -170,7 +174,7 @@ def get_leaderboard(
 
 
 @router.post("", response_model=PlayerRead, status_code=201)
-def create_player(payload: PlayerCreate, session: Session = Depends(get_session)):
+def create_player(payload: PlayerCreate, request: Request, session: Session = Depends(get_session)):
     exists = session.exec(select(Player).where(Player.player_name == payload.player_name)).first()
     if exists:
         raise HTTPException(status_code=400, detail="Le joueur existe deja")
@@ -205,11 +209,12 @@ def create_player(payload: PlayerCreate, session: Session = Depends(get_session)
         .where(Player.id == p.id)
         .options(selectinload(Player.rating))
     ).first()
-    return created
+    return serialize_player(created, show_names=can_see_names(request))
 
 
 @router.get("", response_model=List[PlayerRead])
 def list_players(
+        request: Request,
         limit: int = Query(50, ge=1, le=200),
         offset: int = Query(0, ge=0),
         session: Session = Depends(get_session),
@@ -221,18 +226,18 @@ def list_players(
         .offset(offset)
         .limit(limit)
     )
-    return session.exec(q).all()
+    return serialize_players(session.exec(q).all(), show_names=can_see_names(request))
 
 
 @router.get("/{player_id}", response_model=PlayerRead)
-def get_player(player_id: int, session: Session = Depends(get_session)):
+def get_player(player_id: int, request: Request, session: Session = Depends(get_session)):
     _sync_current_period_ratings(session)
     player = session.exec(
         select(Player).where(Player.id == player_id).options(selectinload(Player.rating))
     ).first()
     if not player:
         raise HTTPException(404, "Joueur introuvable")
-    return player
+    return serialize_player(player, show_names=can_see_names(request))
 
 
 @router.get("/{player_id}/rating-history", response_model=List[PlayerRatingHistoryPoint])
@@ -286,7 +291,7 @@ def get_player_rating_history(
 
 
 @router.put("/{player_id}", response_model=PlayerRead)
-def update_player(player_id: int, payload: PlayerUpdate, session: Session = Depends(get_session)):
+def update_player(player_id: int, payload: PlayerUpdate, request: Request, session: Session = Depends(get_session)):
     p = session.get(Player, player_id)
     if not p:
         raise HTTPException(404, "Joueur introuvable")
@@ -310,7 +315,7 @@ def update_player(player_id: int, payload: PlayerUpdate, session: Session = Depe
     updated = session.exec(
         select(Player).where(Player.id == player_id).options(selectinload(Player.rating))
     ).first()
-    return updated
+    return serialize_player(updated, show_names=can_see_names(request))
 
 
 @router.delete("/{player_id}", status_code=204)

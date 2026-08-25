@@ -8,6 +8,6 @@ if [ ! -s /seed/babyfoot.sql ]; then
 fi
 
 echo "Importing /seed/babyfoot.sql into ${POSTGRES_DB}..."
-sed -E 's/OWNER TO [^;]+;/OWNER TO postgres;/g' /seed/babyfoot.sql \
+sed -E "s/OWNER TO [^;]+;/OWNER TO ${POSTGRES_USER};/g" /seed/babyfoot.sql \
   | psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB"
 echo "Seed import complete."

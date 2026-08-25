@@ -22,6 +22,7 @@ Add current application screenshots in `docs/screenshots/` and keep these filena
 - Preserve per-game rating deltas so match history can explain how rankings changed.
 - View player statistics including games played, wins, win rate, average scores, teammate performance, streaks, and match history.
 - Snapshot rating history daily for historical charts and period-based leaderboards.
+- Optionally mask player names for public visitors while allowing trusted users by password, cookie, or IP allowlist.
 
 ## Architecture
 
@@ -42,6 +43,8 @@ The application is split into four runtime services in Docker Compose:
 - `fastapi`: FastAPI backend exposing REST endpoints under `/api`.
 - `postgres`: PostgreSQL database seeded from `babyfoot.sql` on first container initialization.
 - `nginx`: Public entry point that serves the frontend and proxies `/api`, `/docs`, `/redoc`, and health checks to FastAPI.
+
+Name privacy is enforced at the API serialization layer in `backend/privacy.py`, so player, leaderboard, game, and statistics responses can share the same masking rules before data reaches the frontend.
 
 ## Ranking System
 
@@ -73,6 +76,8 @@ Startup also calls `ensure_current_period_ratings` so the application catches up
 Start the complete stack:
 
 ```bash
+cp .env.example .env
+# Edit .env and replace every placeholder secret before using this outside local development.
 docker compose up --build
 ```
 
@@ -82,7 +87,7 @@ Then open:
 - API docs: `http://localhost:8080/docs`
 - Health check: `http://localhost:8080/healthz`
 
-The default database credentials are defined in `docker-compose.yml` and are intended for local development.
+Database credentials are loaded from `.env`; use `.env.example` as the template and replace the placeholder secrets before running the stack.
 
 ## Development
 
@@ -104,19 +109,28 @@ npm run dev
 Useful environment variables:
 
 - `DATABASE_URL`: SQLAlchemy database URL used by FastAPI.
+- `POSTGRES_DB`: PostgreSQL database name used by Docker Compose. Defaults to `babyfoot`.
+- `POSTGRES_USER`: PostgreSQL user used by Docker Compose. Defaults to `babyfoot_app`.
+- `POSTGRES_PASSWORD`: required PostgreSQL password used by Docker Compose.
+- `POSTGRES_PORT`: local host port bound to Postgres. Defaults to `5432` and is bound to `127.0.0.1` only.
 - `TIMEZONE`: timezone for rating snapshots and period rollovers.
 - `AUTO_POPULATE_IF_EMPTY`: whether the backend should populate an empty database from the configured source.
 - `POPULATE_SOURCE_URL`: source URL used by the optional data population flow.
 - `NAMES_PRIVACY_PASSWORD`: optional shared password that allows player names to be returned.
+- `NAMES_PRIVACY_SESSION_SECRET`: optional signing secret for name-access session cookies. Defaults to `NAMES_PRIVACY_PASSWORD`; set a separate long random value in production.
+- `NAMES_PRIVACY_SESSION_MAX_AGE_SECONDS`: optional session lifetime for name-access cookies. Defaults to 30 days.
 - `NAMES_VISIBLE_IPS`: optional comma-separated IP/CIDR allowlist that can see player names, for example `192.0.2.10,198.51.100.0/24`.
+- `NAMES_TRUSTED_PROXY_IPS`: optional comma-separated IP/CIDR list of reverse proxies whose `X-Real-IP` or `X-Forwarded-For` headers may be trusted for `NAMES_VISIBLE_IPS`.
 - `PUBLIC_API_BASE`: browser-visible API base for the SvelteKit app.
 - `INTERNAL_API_BASE`: server-side API base used by SvelteKit inside Docker.
 
-When either `NAMES_PRIVACY_PASSWORD` or `NAMES_VISIBLE_IPS` is set, player names are replaced with placeholders unless the request comes from an allowlisted IP or includes the password in the `X-Names-Password` header or `names_password` cookie.
+When either `NAMES_PRIVACY_PASSWORD` or `NAMES_VISIBLE_IPS` is set, player names are replaced with placeholders unless the request comes from an allowlisted IP, includes the password in the `X-Names-Password` header, or has a valid backend-issued `HttpOnly` name-access session cookie. The frontend header includes a key button that posts the password to `/api/privacy/names/session`; the backend validates it and sets a signed cookie that JavaScript cannot read. Forwarded IP headers are ignored unless the immediate peer matches `NAMES_TRUSTED_PROXY_IPS`.
+
+Do not commit `.env`. It is ignored by git. If your Postgres password contains URL-reserved characters, URL-encode it in `DATABASE_URL`.
 
 ## Testing
 
-Backend tests cover game payload validation, same-day rating recalculation, rating rebuilds, period rollovers, daily snapshot jobs, and the custom Elo implementation.
+Backend tests cover game payload validation, same-day rating recalculation, rating rebuilds, period rollovers, daily snapshot jobs, name privacy serialization/access rules, and the custom Elo implementation.
 
 ```bash
 uv run --with pytest pytest backend/tests
@@ -133,7 +147,11 @@ npm run lint
 ## Repository Layout
 
 ```text
-backend/                FastAPI app, SQLModel models, API routers, ranking logic, jobs
+backend/api/            FastAPI routers for players, games, stats, and leaderboard data
+backend/db/             SQLModel models and database session setup
+backend/ranking/        Custom Elo-style rating logic and rebuild helpers
+backend/privacy.py      Optional player-name masking helpers
+backend/jobs.py         Scheduled rating snapshots and period rollovers
 front-end/              SvelteKit application
 nginx/                  Reverse proxy configuration
 docker/postgres/init/   PostgreSQL initialization scripts

@@ -1,16 +1,20 @@
 import datetime
+import os
 
 import psycopg2
 
-# Database connection parameters
 
+conn = None
+cursor = None
 
 try:
     # Connect to the PostgreSQL database
     conn = psycopg2.connect(
-        dbname="babyfoot",
-        host="localhost",
-        port="5432"
+        dbname=os.getenv("POSTGRES_DB", "babyfoot"),
+        user=os.getenv("POSTGRES_USER", "babyfoot_app"),
+        password=os.getenv("POSTGRES_PASSWORD"),
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=os.getenv("POSTGRES_PORT", "5432"),
     )
     cursor = conn.cursor()
 

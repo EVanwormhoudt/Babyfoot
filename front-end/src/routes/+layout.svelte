@@ -4,10 +4,14 @@
 	import {onDestroy, onMount} from 'svelte';
 	import Sun from '@lucide/svelte/icons/sun';
 	import Moon from '@lucide/svelte/icons/moon';
+	import KeyRound from '@lucide/svelte/icons/key-round';
 	import {Toaster} from '$lib/components/ui/sonner';
+	import {toast} from 'svelte-sonner';
 	import {navigating, page} from '$app/state';
+	import {invalidateAll} from '$app/navigation';
 	import {getStoredCurrentPlayerId, setStoredCurrentPlayerId} from '$lib/current-player';
 	import {base} from '$app/paths';
+	import {PUBLIC_API_BASE} from '$env/static/public';
 
 	type HeaderPlayer = {
 		id: number;
@@ -38,6 +42,9 @@
 	let mePlayerId = $state('');
 	let pendingWhoAmI = $state('');
 	let showWhoAmIModal = $state(false);
+	let showNamesPasswordModal = $state(false);
+	let namesPassword = $state('');
+	let savingNamesPassword = $state(false);
 	const mePlayer = $derived(
 			selectablePlayers.find((player: HeaderPlayer) => String(player.id) === mePlayerId)
 	);
@@ -79,6 +86,43 @@
 		mePlayerId = String(parsed);
 		setStoredCurrentPlayerId(parsed);
 		showWhoAmIModal = false;
+	}
+
+	async function readApiError(res: Response, fallback: string): Promise<string> {
+		try {
+			const body = await res.json();
+			if (typeof body?.detail === 'string' && body.detail.trim()) return body.detail;
+		} catch {
+			// ignore non-JSON bodies
+		}
+		return fallback;
+	}
+
+	async function saveNamesPassword(event: SubmitEvent) {
+		event.preventDefault();
+		const value = namesPassword.trim();
+		savingNamesPassword = true;
+		try {
+			const res = await fetch(`${PUBLIC_API_BASE}/api/privacy/names/session`, {
+				method: value ? 'POST' : 'DELETE',
+				headers: value ? {'Content-Type': 'application/json'} : undefined,
+				body: value ? JSON.stringify({password: value}) : undefined,
+				credentials: 'include'
+			});
+
+			if (!res.ok) {
+				throw new Error(await readApiError(res, 'Impossible de valider le mot de passe.'));
+			}
+
+			await invalidateAll();
+			showNamesPasswordModal = false;
+			namesPassword = '';
+			toast.success(value ? 'Mot de passe enregistre.' : 'Mot de passe retire.');
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : 'Impossible de valider le mot de passe.');
+		} finally {
+			savingNamesPassword = false;
+		}
 	}
 
 	function syncFaviconWithTheme() {
@@ -209,6 +253,15 @@
 					</label>
 				{/if}
 				<button
+						aria-label="Definir le mot de passe des noms"
+						class="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-secondary/70 px-3 text-sm font-semibold text-secondary-foreground transition hover:bg-secondary"
+						onclick={() => (showNamesPasswordModal = true)}
+						title="Definir le mot de passe des noms"
+						type="button"
+				>
+					<KeyRound class="size-4"/>
+				</button>
+				<button
 						aria-label={themeToggleLabel()}
 						class="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-secondary/70 px-3 text-sm font-semibold text-secondary-foreground transition hover:bg-secondary"
 						onclick={handleThemeToggle}
@@ -259,6 +312,49 @@
 			>
 				Continuer
 			</button>
+		</div>
+	</div>
+{/if}
+
+{#if showNamesPasswordModal}
+	<div class="fixed inset-0 z-[120] bg-background/70 backdrop-blur-sm">
+		<div
+				class="mx-auto mt-[12vh] w-[min(92vw,420px)] rounded-2xl border border-border/90 bg-card p-5 shadow-[0_18px_40px_rgba(15,23,42,0.22)]"
+		>
+			<h2 class="font-display text-2xl font-bold text-foreground">Acces aux noms</h2>
+			<form class="mt-4 space-y-4" onsubmit={saveNamesPassword}>
+				<label class="flex flex-col gap-2">
+					<span class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+					>Mot de passe</span
+					>
+					<input
+							bind:value={namesPassword}
+							class="h-10 rounded-xl border border-border/85 bg-background px-3 text-sm text-foreground"
+							type="password"
+							autocomplete="current-password"
+					/>
+				</label>
+
+				<div class="flex gap-2">
+					<button
+							type="submit"
+							class="inline-flex h-10 flex-1 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+							disabled={savingNamesPassword}
+					>
+						{savingNamesPassword ? 'Enregistrement...' : 'Enregistrer'}
+					</button>
+					<button
+							type="button"
+							class="inline-flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-secondary/70 text-sm font-semibold text-secondary-foreground transition hover:bg-secondary"
+							onclick={() => {
+								showNamesPasswordModal = false;
+								namesPassword = '';
+							}}
+					>
+						Annuler
+					</button>
+				</div>
+			</form>
 		</div>
 	</div>
 {/if}

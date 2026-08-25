@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Dict, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func, and_
 from sqlalchemy.orm import aliased, selectinload
@@ -13,6 +13,7 @@ from .db_errors import map_integrity_error
 from ..db.models import Game, Team, Player, GamePlayerRatingChange, PlayerRatingHistory
 from ..db.session import get_session
 from ..period_rollover import ensure_current_period_ratings
+from ..privacy import can_see_names, serialize_game, serialize_games
 from ..ranking import (
     calculate_game_rating_snapshots,
     build_game_rating_change_rows,
@@ -77,6 +78,7 @@ def _same_day_base_snapshot(
 
 @router.get("", response_model=GamesList)
 def get_games(
+        request: Request,
         session: Session = Depends(get_session),
         scope: Literal["all", "monthly"] = Query("all"),
         limit: int = Query(10, ge=1, le=200),
@@ -120,7 +122,7 @@ def get_games(
     if end_date:
         count_stmt = count_stmt.where(Game.game_timestamp <= end_date)
     total_games = session.exec(count_stmt).one()
-    return {"items": games, "total": total_games}
+    return {"items": serialize_games(games, show_names=can_see_names(request)), "total": total_games}
 
 
 def _validate_game_payload(payload: GameCreate, session: Session) -> Dict[int, Player]:
@@ -216,7 +218,11 @@ def _validate_game_payload(payload: GameCreate, session: Session) -> Dict[int, P
 
 
 @router.post("", response_model=GameRead, status_code=201)
-def create_game(game: GameCreate, session: Session = Depends(get_session)):
+def create_game(game: GameCreate, request: Request, session: Session = Depends(get_session)):
+    if isinstance(request, Session):
+        session = request
+        request = None
+
     if ensure_current_period_ratings(session):
         session.commit()
     players_by_id = _validate_game_payload(game, session)
@@ -276,7 +282,7 @@ def create_game(game: GameCreate, session: Session = Depends(get_session)):
             .options(selectinload(Game.teams).selectinload(Team.player), selectinload(Game.rating_changes))
             .where(Game.id == new_game.id)
         ).first()
-        return game_full
+        return serialize_game(game_full, show_names=True if request is None else can_see_names(request))
     except HTTPException:
         session.rollback()
         raise
@@ -289,7 +295,7 @@ def create_game(game: GameCreate, session: Session = Depends(get_session)):
 
 
 @router.get("/{game_id}", response_model=GameRead)
-def get_game(game_id: int, session: Session = Depends(get_session)) -> GameRead:
+def get_game(game_id: int, request: Request, session: Session = Depends(get_session)) -> GameRead:
     game = session.exec(
         select(Game)
         .where(Game.id == game_id)
@@ -297,11 +303,11 @@ def get_game(game_id: int, session: Session = Depends(get_session)) -> GameRead:
     ).first()
     if not game:
         raise HTTPException(404, "Match introuvable")
-    return game
+    return serialize_game(game, show_names=can_see_names(request))
 
 
 @router.put("/{game_id}", response_model=GameRead)
-def update_game(game_id: int, payload: GameUpdate, session: Session = Depends(get_session)):
+def update_game(game_id: int, payload: GameUpdate, request: Request, session: Session = Depends(get_session)):
     g = session.get(Game, game_id)
     if not g:
         raise HTTPException(404, "Match introuvable")
@@ -328,7 +334,7 @@ def update_game(game_id: int, payload: GameUpdate, session: Session = Depends(ge
         .where(Game.id == game_id)
         .options(selectinload(Game.teams).selectinload(Team.player), selectinload(Game.rating_changes))
     ).first()
-    return updated
+    return serialize_game(updated, show_names=can_see_names(request))
 
 
 @router.delete("/{game_id}", status_code=204)

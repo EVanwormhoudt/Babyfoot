@@ -2,12 +2,15 @@ import requests
 from bs4 import BeautifulSoup
 import psycopg2
 from datetime import datetime
+import os
 
 # Connect to PostgreSQL Database
 conn = psycopg2.connect(
-    dbname="babyfoot",
-    host="localhost",
-    port="5432"
+    dbname=os.getenv("POSTGRES_DB", "babyfoot"),
+    user=os.getenv("POSTGRES_USER", "babyfoot_app"),
+    password=os.getenv("POSTGRES_PASSWORD"),
+    host=os.getenv("POSTGRES_HOST", "localhost"),
+    port=os.getenv("POSTGRES_PORT", "5432"),
 )
 cursor = conn.cursor()
 
