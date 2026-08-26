@@ -5,6 +5,7 @@
 	import Sun from '@lucide/svelte/icons/sun';
 	import Moon from '@lucide/svelte/icons/moon';
 	import KeyRound from '@lucide/svelte/icons/key-round';
+	import X from '@lucide/svelte/icons/x';
 	import {Toaster} from '$lib/components/ui/sonner';
 	import {toast} from 'svelte-sonner';
 	import {navigating, page} from '$app/state';
@@ -20,8 +21,13 @@
 		active?: boolean;
 	};
 
+	type NamesPrivacySession = {
+		configured: boolean;
+		can_see_names: boolean;
+	};
+
 	let {children, data} = $props<{
-		data: { playersLite?: HeaderPlayer[] };
+		data: { playersLite?: HeaderPlayer[]; privacySession?: NamesPrivacySession };
 	}>();
 
 	const navItems = [
@@ -43,8 +49,17 @@
 	let pendingWhoAmI = $state('');
 	let showWhoAmIModal = $state(false);
 	let showNamesPasswordModal = $state(false);
+	let dismissedAnonymizedNotice = $state(false);
 	let namesPassword = $state('');
 	let savingNamesPassword = $state(false);
+	const isViewingAnonymizedContent = $derived(
+			data.privacySession?.configured === true && data.privacySession.can_see_names === false
+	);
+	$effect(() => {
+		if (!isViewingAnonymizedContent) {
+			dismissedAnonymizedNotice = false;
+		}
+	});
 	const mePlayer = $derived(
 			selectablePlayers.find((player: HeaderPlayer) => String(player.id) === mePlayerId)
 	);
@@ -355,6 +370,41 @@
 					</button>
 				</div>
 			</form>
+		</div>
+	</div>
+{/if}
+
+{#if isViewingAnonymizedContent && !dismissedAnonymizedNotice && !showNamesPasswordModal}
+	<div class="fixed bottom-4 left-1/2 z-[110] w-[min(calc(100vw-2rem),460px)] -translate-x-1/2 rounded-2xl border border-border/90 bg-card p-4 shadow-[0_18px_44px_rgba(15,23,42,0.24)]">
+		<div class="flex gap-3">
+			<div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
+				<KeyRound class="size-4"/>
+			</div>
+			<div class="min-w-0 flex-1">
+				<h2 class="text-sm font-semibold text-foreground">Contenu anonymise</h2>
+				<p class="mt-1 text-sm leading-5 text-muted-foreground">
+					Vous consultez actuellement du contenu anonymise.
+				</p>
+				<button
+						type="button"
+						class="mt-3 inline-flex h-9 items-center justify-center rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+						onclick={() => {
+							showNamesPasswordModal = true;
+							dismissedAnonymizedNotice = true;
+						}}
+				>
+					Entrer le mot de passe
+				</button>
+			</div>
+			<button
+					type="button"
+					aria-label="Fermer"
+					title="Fermer"
+					class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+					onclick={() => (dismissedAnonymizedNotice = true)}
+			>
+				<X class="size-4"/>
+			</button>
 		</div>
 	</div>
 {/if}
