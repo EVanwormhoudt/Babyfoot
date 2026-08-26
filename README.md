@@ -128,6 +128,8 @@ When either `NAMES_PRIVACY_PASSWORD` or `NAMES_VISIBLE_IPS` is set, player names
 
 Do not commit `.env`. It is ignored by git. If your Postgres password contains URL-reserved characters, URL-encode it in `DATABASE_URL`.
 
+If Cloudflare Tunnel points only at the SvelteKit frontend, keep `PUBLIC_API_BASE` empty and set `INTERNAL_API_BASE=http://fastapi:8000`. The frontend proxies `/api/...` requests to FastAPI and forwards Cloudflare's original visitor IP as a sanitized internal header. In that topology, put real allowed visitor IPs in `NAMES_VISIBLE_IPS`, and put the internal frontend/proxy network that connects to FastAPI in `NAMES_TRUSTED_PROXY_IPS`, for example `172.16.0.0/12` for Docker bridge networks.
+
 ## Testing
 
 Backend tests cover game payload validation, same-day rating recalculation, rating rebuilds, period rollovers, daily snapshot jobs, name privacy serialization/access rules, and the custom Elo implementation.
