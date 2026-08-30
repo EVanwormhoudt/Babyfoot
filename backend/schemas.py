@@ -33,6 +33,7 @@ class PlayerRead(PlayerCreate):
     id: int
     active: bool
     rating: Optional[RankRead] = None
+    last_game_timestamp: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

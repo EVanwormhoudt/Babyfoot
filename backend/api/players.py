@@ -99,10 +99,15 @@ def get_leaderboard(
 
     if use_live or leaderboard_type == "overall":
         # Live / overall: use CurrentPlayerRank relationship
-        players_live: List[Player] = session.exec(
+        players_stmt = (
             select(Player)
-            .where(Player.active == True)
             .options(selectinload(Player.rating))
+        )
+        if leaderboard_type != "overall":
+            players_stmt = players_stmt.where(Player.active == True)
+
+        players_live: List[Player] = session.exec(
+            players_stmt
         ).all()
         rows = [(p, None) for p in players_live]  # normalize shape to (Player, hist)
     else:
@@ -220,13 +225,27 @@ def list_players(
         session: Session = Depends(get_session),
 ):
     _sync_current_period_ratings(session)
+    latest_game_sq = (
+        select(
+            Team.player_id.label("player_id"),
+            func.max(Game.game_timestamp).label("last_game_timestamp"),
+        )
+        .join(Game, Game.id == Team.game_id)
+        .group_by(Team.player_id)
+        .subquery()
+    )
     q = (
-        select(Player)
+        select(Player, latest_game_sq.c.last_game_timestamp)
+        .join(latest_game_sq, latest_game_sq.c.player_id == Player.id, isouter=True)
         .options(selectinload(Player.rating))
         .offset(offset)
         .limit(limit)
     )
-    return serialize_players(session.exec(q).all(), show_names=can_see_names(request))
+    players = []
+    for player, last_game_timestamp in session.exec(q).all():
+        player.__dict__["last_game_timestamp"] = last_game_timestamp
+        players.append(player)
+    return serialize_players(players, show_names=can_see_names(request))
 
 
 @router.get("/{player_id}", response_model=PlayerRead)

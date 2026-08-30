@@ -86,6 +86,7 @@ def get_games(
         offset: int = Query(0, ge=0),
         start_date: Optional[datetime] = Query(None, description="Filter games starting from this date"),
         end_date: Optional[datetime] = Query(None, description="Filter games up to this date"),
+        player_id: Optional[int] = Query(None, ge=1, description="Filter games involving this player"),
 ) -> GamesList:
     if start_date and end_date and start_date > end_date:
         raise HTTPException(422, "start_date doit etre <= end_date")
@@ -108,6 +109,9 @@ def get_games(
         stmt = stmt.where(Game.game_timestamp >= start_date)
     if end_date:
         stmt = stmt.where(Game.game_timestamp <= end_date)
+    if player_id is not None:
+        player_game_ids = select(Team.game_id).where(Team.player_id == player_id)
+        stmt = stmt.where(Game.id.in_(player_game_ids))
 
     stmt = stmt.order_by(Game.game_timestamp.desc()).offset(offset).limit(limit)
     games = session.exec(stmt).all()
@@ -122,6 +126,9 @@ def get_games(
         count_stmt = count_stmt.where(Game.game_timestamp >= start_date)
     if end_date:
         count_stmt = count_stmt.where(Game.game_timestamp <= end_date)
+    if player_id is not None:
+        player_game_ids = select(Team.game_id).where(Team.player_id == player_id)
+        count_stmt = count_stmt.where(Game.id.in_(player_game_ids))
     total_games = session.exec(count_stmt).one()
     return {"items": serialize_games(games, show_names=can_see_names(request)), "total": total_games}
 
