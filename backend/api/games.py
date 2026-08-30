@@ -12,6 +12,7 @@ from sqlmodel import Session, select
 from .db_errors import map_integrity_error
 from ..db.models import Game, Team, Player, GamePlayerRatingChange, PlayerRatingHistory
 from ..db.session import get_session
+from ..jobs import snapshot_missing_daily_ratings_if_safe
 from ..period_rollover import ensure_current_period_ratings
 from ..privacy import can_see_names, serialize_game, serialize_games
 from ..ranking import (
@@ -223,7 +224,9 @@ def create_game(game: GameCreate, request: Request, session: Session = Depends(g
         session = request
         request = None
 
-    if ensure_current_period_ratings(session):
+    changed = snapshot_missing_daily_ratings_if_safe(session, warn_if_unsafe=False) > 0
+    changed = ensure_current_period_ratings(session) or changed
+    if changed:
         session.commit()
     players_by_id = _validate_game_payload(game, session)
 

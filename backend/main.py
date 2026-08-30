@@ -14,6 +14,7 @@ from .api import router as api_router
 from .database_setup.seed_if_empty import populate_if_empty
 from .db.session import engine, init_db
 from .jobs import (
+    snapshot_missing_daily_ratings_if_safe,
     snapshot_daily_ratings_and_roll_periods,
 )
 from .period_rollover import ensure_current_period_ratings
@@ -41,7 +42,9 @@ async def lifespan(app: FastAPI):
     init_db()
     populate_if_empty()
     with Session(engine) as session:
-        if ensure_current_period_ratings(session):
+        changed = snapshot_missing_daily_ratings_if_safe(session) > 0
+        changed = ensure_current_period_ratings(session) or changed
+        if changed:
             session.commit()
     scheduler.add_listener(_log_scheduler_event, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED)
     scheduler.add_job(
