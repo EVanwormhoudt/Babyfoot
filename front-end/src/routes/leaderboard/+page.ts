@@ -5,7 +5,7 @@ import {getLeaderboard} from '$lib/api/players';
 export const ssr = false; // client-only to avoid eager SSR fetches
 
 type Scope = 'monthly' | 'yearly' | 'overall';
-type PlayerRow = { id: number; name: string; wins: number; losses: number; elo: number };
+type PlayerRow = { id: number; name: string; wins: number; losses: number; elo: number; active: boolean };
 
 const DEFAULT_SCOPE: Scope = 'yearly';
 
@@ -26,7 +26,7 @@ export const load: PageLoad = async ({fetch, url}) => {
 
     // Expecting an array of players with { player_name, active, rating: { mu_*, sigma_* } }
     const filtered = Array.isArray(raw)
-        ? raw.filter((p: any) => p?.active === true)
+        ? raw.filter((p: any) => scope === 'overall' || p?.active === true)
             .filter((p: any) => (p?.games_played > 0)) : [];
     const players: PlayerRow[] = filtered
         .map((p: any) => {
@@ -45,7 +45,8 @@ export const load: PageLoad = async ({fetch, url}) => {
                 name: p.player_name ?? p.name ?? 'Inconnu',
                 wins: p.wins,
                 losses: p.games_played - p.wins,
-                elo: Math.round(muNum)
+                elo: Math.round(muNum),
+                active: p.active !== false
             };
         })
         .sort((a, b) => b.elo - a.elo);

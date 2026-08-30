@@ -9,6 +9,7 @@
 	import { toast } from 'svelte-sonner';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 	import { getStoredCurrentPlayerId, onCurrentPlayerChange } from '$lib/current-player';
 	import { createGame, getGames } from '$lib/api/matches';
@@ -19,11 +20,13 @@
 		player_name: string;
 		player_color: string;
 		active: boolean;
+		last_game_timestamp?: string | null;
 	};
 	type DndItem = {
 		id: number;
 		name: string;
 		color?: string;
+		lastGameTimestamp: string | null;
 	};
 	type DndDetail = {
 		items: DndItem[];
@@ -37,21 +40,62 @@
 	const playersLite: PlayerLite[] = Array.isArray(data?.playersLite) ? data.playersLite : [];
 
 	// Column IDs
-	const COL_PLAYERS = 1;
+	const COL_RECENT_PLAYERS = 1;
 	const COL_RED = 2;
 	const COL_BLUE = 3;
+	const COL_DORMANT_PLAYERS = 4;
+	const RECENT_MATCH_WINDOW_MONTHS = 3;
+	const PLAYER_ROW_HEIGHT_PX = 48;
+	const PLAYER_GRID_GAP_PX = 8;
+	const PLAYER_GRID_PADDING_Y_PX = 16;
+	const recentMatchCutoffMs = (() => {
+		const cutoff = new Date();
+		cutoff.setMonth(cutoff.getMonth() - RECENT_MATCH_WINDOW_MONTHS);
+		return cutoff.getTime();
+	})();
 	let currentPlayerId = $state<number | null>(null);
+	let dormantPlayersExpanded = $state(false);
+	let normalizeAvailableColumnsTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function normalizeItem(player: PlayerLite): DndItem {
 		return {
 			id: player.id,
 			name: player.player_name,
-			color: player.player_color
+			color: player.player_color,
+			lastGameTimestamp: player.last_game_timestamp ?? null
 		};
 	}
 
 	function sortByName(a: DndItem, b: DndItem) {
 		return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+	}
+
+	function wasPlayedRecently(timestamp: string | null | undefined) {
+		if (!timestamp) return false;
+		const playedAt = new Date(timestamp).getTime();
+		return Number.isFinite(playedAt) && playedAt >= recentMatchCutoffMs;
+	}
+
+	function isRecentPlayer(player: PlayerLite) {
+		return wasPlayedRecently(player.last_game_timestamp);
+	}
+
+	function isRecentItem(item: DndItem) {
+		return wasPlayedRecently(item.lastGameTimestamp);
+	}
+
+	function isAvailableColumnId(columnId: number) {
+		return columnId === COL_RECENT_PLAYERS || columnId === COL_DORMANT_PLAYERS;
+	}
+
+	function homeColumnIdForItem(item: DndItem) {
+		return isRecentItem(item) ? COL_RECENT_PLAYERS : COL_DORMANT_PLAYERS;
+	}
+
+	function availableHeightFor(count: number) {
+		const rows = Math.max(1, Math.ceil(count / 5));
+		const gaps = Math.max(0, rows - 1) * PLAYER_GRID_GAP_PX;
+		return `${PLAYER_GRID_PADDING_Y_PX + rows * PLAYER_ROW_HEIGHT_PX + gaps}px`;
 	}
 
 	function isCurrentPlayer(item: DndItem) {
@@ -61,13 +105,23 @@
 	type MatchColumn = { id: number; name: string; class: string; items: DndItem[] };
 
 	function buildInitialColumns(): MatchColumn[] {
+		const activePlayers = playersLite.filter((p) => p.active !== false);
 		return [
 			{
-				id: COL_PLAYERS,
-				name: 'Joueurs disponibles',
+				id: COL_RECENT_PLAYERS,
+				name: 'Joueurs recents',
 				class: 'players',
-				items: playersLite
-					.filter((p) => p.active)
+				items: activePlayers
+					.filter(isRecentPlayer)
+					.map(normalizeItem)
+					.sort(sortByName)
+			},
+			{
+				id: COL_DORMANT_PLAYERS,
+				name: 'Sans match depuis 3 mois',
+				class: 'players-dormant',
+				items: activePlayers
+					.filter((p) => !isRecentPlayer(p))
 					.map(normalizeItem)
 					.sort(sortByName)
 			},
@@ -79,13 +133,13 @@
 	// DnD columns use $state so nested mutations are reactive
 	let columnItems = $state<MatchColumn[]>(buildInitialColumns());
 
-	const availablePool = $derived(columnItems.find((c) => c.id === COL_PLAYERS));
-	const availableItems = $derived(availablePool?.items ?? []);
-	const totalAvailable = $derived(availableItems.length);
-
-	// layout derived from each pool (5 columns, 55px row height)
-	const availableRows = $derived(Math.max(1, Math.ceil(availableItems.length / 5)));
-	const availableHeight = $derived(`${availableRows * 55}px`);
+	const recentAvailablePool = $derived(columnItems.find((c) => c.id === COL_RECENT_PLAYERS));
+	const dormantAvailablePool = $derived(columnItems.find((c) => c.id === COL_DORMANT_PLAYERS));
+	const recentAvailableItems = $derived(recentAvailablePool?.items ?? []);
+	const dormantAvailableItems = $derived(dormantAvailablePool?.items ?? []);
+	const totalAvailable = $derived(recentAvailableItems.length + dormantAvailableItems.length);
+	const recentAvailableHeight = $derived(availableHeightFor(recentAvailableItems.length));
+	const dormantAvailableHeight = $derived(availableHeightFor(dormantAvailableItems.length));
 
 	const flipDurationMs = 180;
 	const dropTargetStyle = {};
@@ -130,6 +184,40 @@
 		const col = columnItems.find((c) => c.id === cid);
 		if (!col) return;
 		col.items = e.detail.items;
+		if (isAvailableColumnId(cid)) {
+			queueAvailableNormalization();
+		}
+	}
+
+	function queueAvailableNormalization() {
+		if (normalizeAvailableColumnsTimer !== null) return;
+		normalizeAvailableColumnsTimer = setTimeout(() => {
+			normalizeAvailableColumnsTimer = null;
+			normalizeAvailableColumns();
+		}, 0);
+	}
+
+	function normalizeAvailableColumns() {
+		const recentColumn = columnItems.find((c) => c.id === COL_RECENT_PLAYERS);
+		const dormantColumn = columnItems.find((c) => c.id === COL_DORMANT_PLAYERS);
+		if (!recentColumn || !dormantColumn) return;
+
+		const recentItems: DndItem[] = [];
+		const dormantItems: DndItem[] = [];
+		const seen = new Set<number>();
+
+		for (const item of [...recentColumn.items, ...dormantColumn.items]) {
+			if (seen.has(item.id)) continue;
+			seen.add(item.id);
+			if (isRecentItem(item)) {
+				recentItems.push(item);
+			} else {
+				dormantItems.push(item);
+			}
+		}
+
+		recentColumn.items = recentItems.sort(sortByName);
+		dormantColumn.items = dormantItems.sort(sortByName);
 	}
 
 	// Quick-move helpers
@@ -147,10 +235,16 @@
 		if (!found) return;
 
 		// add to target column (avoid duplicates)
-		const target = columnItems.find((c) => c.id === targetColId);
+		const resolvedTargetColId = isAvailableColumnId(targetColId)
+			? homeColumnIdForItem(found)
+			: targetColId;
+		const target = columnItems.find((c) => c.id === resolvedTargetColId);
 		if (!target) return;
 		if (!target.items.some((i) => i.id === found!.id)) {
 			target.items = [...target.items, found!];
+			if (isAvailableColumnId(resolvedTargetColId)) {
+				target.items = [...target.items].sort(sortByName);
+			}
 		}
 	}
 
@@ -451,15 +545,15 @@
 		<Card.Content class="space-y-4 pt-2">
 			<div class="space-y-2">
 				<div class="flex items-center justify-between">
-					<p class="editorial-kicker">Joueurs disponibles</p>
+					<p class="editorial-kicker">Ont joué ces 3 derniers mois</p>
 					<span class="rounded-full bg-card px-2.5 py-0.5 text-xs text-muted-foreground">
-						{availableItems.length}
+						{recentAvailableItems.length}
 					</span>
 				</div>
 				<section
 					class="available-list grid grid-cols-2 justify-items-center gap-2 rounded-2xl p-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
 					use:dndzone={{
-						items: availableItems,
+						items: recentAvailableItems,
 						type: 'player',
 						flipDurationMs,
 						dropTargetStyle: dropTargetStyleMain,
@@ -467,11 +561,11 @@
 						centreDraggedOnCursor: true,
 						transformDraggedElement
 					}}
-					onconsider={(e) => handleDndConsiderCards(COL_PLAYERS, e)}
-					onfinalize={(e) => handleDndFinalizeCards(COL_PLAYERS, e)}
-					style="height: {availableHeight};"
+					onconsider={(e) => handleDndConsiderCards(COL_RECENT_PLAYERS, e)}
+					onfinalize={(e) => handleDndFinalizeCards(COL_RECENT_PLAYERS, e)}
+					style="height: {recentAvailableHeight};"
 				>
-					{#each availableItems as item (item.id)}
+					{#each recentAvailableItems as item (item.id)}
 						<div
 							animate:flip={{ duration: flipDurationMs }}
 							class={`player-chip group relative h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl px-3 text-[15px] font-semibold text-foreground transition hover:border-primary/55 hover:bg-primary/10 active:cursor-grabbing ${isCurrentPlayer(item) ? 'whoami-chip' : ''}`}
@@ -501,6 +595,78 @@
 						</div>
 					{/each}
 				</section>
+			</div>
+
+			<div class="space-y-2">
+				<button
+					type="button"
+					class="available-expander flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-2 text-left"
+					aria-expanded={dormantPlayersExpanded}
+					aria-controls="dormant-player-pool"
+					onclick={() => (dormantPlayersExpanded = !dormantPlayersExpanded)}
+				>
+					<span class="min-w-0">
+						<span class="editorial-kicker block">Sans match depuis 3 mois</span>
+
+					</span>
+					<span class="flex shrink-0 items-center gap-2">
+						<span class="rounded-full bg-card px-2.5 py-0.5 text-xs text-muted-foreground">
+							{dormantAvailableItems.length}
+						</span>
+						<ChevronDown
+							class={`size-4 text-muted-foreground transition-transform ${dormantPlayersExpanded ? 'rotate-180' : ''}`}
+						/>
+					</span>
+				</button>
+
+				{#if dormantPlayersExpanded}
+					<section
+						id="dormant-player-pool"
+						class="available-list dormant-list grid grid-cols-2 justify-items-center gap-2 rounded-2xl p-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+						use:dndzone={{
+							items: dormantAvailableItems,
+							type: 'player',
+							flipDurationMs,
+							dropTargetStyle: dropTargetStyleMain,
+							dropTargetClasses: dropTargetClassesMain,
+							centreDraggedOnCursor: true,
+							transformDraggedElement
+						}}
+						onconsider={(e) => handleDndConsiderCards(COL_DORMANT_PLAYERS, e)}
+						onfinalize={(e) => handleDndFinalizeCards(COL_DORMANT_PLAYERS, e)}
+						style="height: {dormantAvailableHeight};"
+					>
+						{#each dormantAvailableItems as item (item.id)}
+							<div
+								animate:flip={{ duration: flipDurationMs }}
+								class={`player-chip group relative h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl px-3 text-[15px] font-semibold text-foreground transition hover:border-primary/55 hover:bg-primary/10 active:cursor-grabbing ${isCurrentPlayer(item) ? 'whoami-chip' : ''}`}
+								title={item.name}
+							>
+								<div class="flex h-full items-center justify-between gap-2">
+									<div class="flex min-w-0 items-center gap-2">
+										<span class="truncate">{item.name}</span>
+									</div>
+									<span class="text-muted-foreground">⠿</span>
+								</div>
+
+								<div
+									class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100"
+								>
+									<button
+										class="tag-action tag-action-red"
+										title="Envoyer en rouge"
+										onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}>R</button
+									>
+									<button
+										class="tag-action tag-action-blue"
+										title="Envoyer en bleu"
+										onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}>B</button
+									>
+								</div>
+							</div>
+						{/each}
+					</section>
+				{/if}
 			</div>
 		</Card.Content>
 	</Card.Root>
@@ -554,7 +720,7 @@
 									<button
 										class="tag-action tag-action-neutral"
 										title="Retour aux joueurs"
-										onclick={withNoDrag(() => moveItemToColumn(item.id, COL_PLAYERS))}>X</button
+										onclick={withNoDrag(() => moveItemToColumn(item.id, homeColumnIdForItem(item)))}>X</button
 									>
 								</div>
 							</div>
@@ -683,7 +849,7 @@
 									<button
 										class="tag-action tag-action-neutral"
 										title="Retour aux joueurs"
-										onclick={withNoDrag(() => moveItemToColumn(item.id, COL_PLAYERS))}>X</button
+										onclick={withNoDrag(() => moveItemToColumn(item.id, homeColumnIdForItem(item)))}>X</button
 									>
 								</div>
 							</div>
@@ -799,6 +965,23 @@
 	.available-list {
 		border: 1px solid hsl(var(--border) / 0.9);
 		background: hsl(var(--background) / 0.82);
+	}
+
+	.dormant-list {
+		background: hsl(var(--secondary) / 0.34);
+	}
+
+	.available-expander {
+		border: 1px solid hsl(var(--border) / 0.9);
+		background: hsl(var(--background) / 0.82);
+		transition:
+			border-color 140ms ease,
+			background-color 140ms ease;
+	}
+
+	.available-expander:hover {
+		border-color: hsl(var(--primary) / 0.35);
+		background: hsl(var(--secondary) / 0.42);
 	}
 
 	.team-zone {

@@ -42,6 +42,7 @@ export async function getGames(
         offset?: number;
         start_date?: string;
         end_date?: string;
+        player_id?: number;
     },
     fetcher?: F
 ): Promise<{ items: GameRead[]; total: number }> {
@@ -52,7 +53,8 @@ export async function getGames(
         limit: String(params.limit ?? 10),
         offset: String(params.offset ?? 0),
         ...(params.start_date ? {start_date: params.start_date} : {}),
-        ...(params.end_date ? {end_date: params.end_date} : {})
+        ...(params.end_date ? {end_date: params.end_date} : {}),
+        ...(params.player_id ? {player_id: String(params.player_id)} : {})
     });
 
     const res = await f(`${PUBLIC_API_BASE}/api/games?${qs.toString()}`, {

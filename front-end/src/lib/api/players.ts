@@ -10,6 +10,7 @@ export type PlayerLite = {
     player_name: string;
     player_color: string;
     active?: boolean;
+    last_game_timestamp?: string | null;
 };
 export type TeammateStat = {
     player_id: number;

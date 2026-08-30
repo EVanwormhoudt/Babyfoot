@@ -23,6 +23,9 @@
 	let savingEdit = false;
 	let editTeam1Score = '';
 	let editTeam2Score = '';
+	let selectedPlayerId = String(data.player_id ?? '');
+
+	$: selectedPlayerId = String(data.player_id ?? '');
 
 	function pushRangeToUrl(r?: { start?: DateValue; end?: DateValue }) {
 		if (!r?.start || !r?.end) return;
@@ -51,6 +54,17 @@
 			else u.set(k, String(v));
 		}
 		return u.toString();
+	}
+
+	async function applyPlayerFilter(event: Event) {
+		const value = (event.currentTarget as HTMLSelectElement).value;
+		await goto(`?${buildQuery({ player_id: value || undefined, page: 1 })}`, {
+			replaceState: true
+		});
+	}
+
+	function playerFilterLabel(player: PageData['players'][number]) {
+		return player.active === false ? `${player.player_name} (inactif)` : player.player_name;
 	}
 
 	function dayKey(dt: string) {
@@ -265,11 +279,12 @@
 		pushRangeToUrl(range);
 	}
 
-	async function clearDates() {
+	async function clearFilters() {
 		range = undefined;
 		const sp = new URLSearchParams(page.url.searchParams);
 		sp.delete('start_date');
 		sp.delete('end_date');
+		sp.delete('player_id');
 		sp.set('page', '1');
 
 		await goto(`?${sp.toString()}`, {replaceState: true});
@@ -297,6 +312,26 @@
 		<div class="flex flex-wrap items-center justify-between gap-3">
 			<p class="editorial-kicker">Filtres matchs</p>
 			<div class="flex flex-wrap items-center gap-2">
+				{#if data.players.length > 0}
+					<label
+						class="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+					>
+						<span
+							class="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+							>Joueur</span
+						>
+						<select
+							bind:value={selectedPlayerId}
+							class="h-8 min-w-[180px] bg-transparent text-sm text-foreground outline-none"
+							onchange={applyPlayerFilter}
+						>
+							<option value="">Tous les joueurs</option>
+							{#each data.players as player (player.id)}
+								<option value={String(player.id)}>{playerFilterLabel(player)}</option>
+							{/each}
+						</select>
+					</label>
+				{/if}
 				<Popover.Root>
 					<Popover.Trigger>
 						<Button class="w-[260px] justify-start font-normal" variant="outline">
@@ -312,11 +347,11 @@
 				<Button onclick={() => setMonth(0)} variant="secondary">Ce mois-ci</Button>
 				<Button onclick={() => setMonth(-1)} variant="ghost">Mois precedent</Button>
 				<Button
-					onclick={clearDates}
+					onclick={clearFilters}
 					variant="ghost"
 					class="border border-destructive/60 text-destructive hover:bg-destructive/10 hover:text-destructive"
 				>
-					Effacer
+					Tout effacer
 				</Button>
 			</div>
 		</div>

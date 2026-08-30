@@ -5,7 +5,14 @@
     import * as Table from "$lib/components/ui/table/index.js";
     import {getStoredCurrentPlayerId, onCurrentPlayerChange} from "$lib/current-player";
 
-    type LeaderboardPlayer = { id: number; name: string; wins: number; losses: number; elo: number };
+    type LeaderboardPlayer = {
+        id: number;
+        name: string;
+        wins: number;
+        losses: number;
+        elo: number;
+        active: boolean;
+    };
     type RankedPlayer = LeaderboardPlayer & { rank: number };
 
     let {data} = $props<{
@@ -149,6 +156,9 @@
                             {#if isCurrentPlayer(row)}
                                 <p class="mt-1 text-[10px] font-semibold uppercase tracking-[0.13em] tone-positive">Vous</p>
                             {/if}
+                            {#if row.active === false}
+                                <p class="mt-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">Inactif</p>
+                            {/if}
                             <p class="mt-2 font-display text-2xl font-bold text-primary">{row.elo}</p>
                         {:else}
                             <p class="mt-5 text-xs text-muted-foreground">Aucun joueur</p>
@@ -262,6 +272,9 @@
                                     <span>{player.name}</span>
                                     {#if isCurrentPlayer(player)}
                                         <span class="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] tone-positive">Vous</span>
+                                    {/if}
+                                    {#if player.active === false}
+                                        <span class="rounded-full border border-border/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Inactif</span>
                                     {/if}
                                 </div>
                             </div>
