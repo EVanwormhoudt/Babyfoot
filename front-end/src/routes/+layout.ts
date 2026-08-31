@@ -1,6 +1,5 @@
 import type {LayoutLoad} from './$types';
 import {getPlayers} from '$lib/api/players';
-import {PUBLIC_API_BASE} from '$env/static/public';
 
 export type NamesPrivacySession = {
     configured: boolean;
@@ -8,7 +7,7 @@ export type NamesPrivacySession = {
 };
 
 async function getNamesPrivacySession(eventFetch: typeof fetch): Promise<NamesPrivacySession> {
-    const res = await eventFetch(`${PUBLIC_API_BASE}/api/privacy/names/session`, {
+    const res = await eventFetch('/api/privacy/names/session', {
         credentials: 'include'
     });
     if (!res.ok) {

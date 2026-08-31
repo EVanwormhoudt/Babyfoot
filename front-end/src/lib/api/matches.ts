@@ -1,7 +1,7 @@
-import {PUBLIC_API_BASE} from '$env/static/public';
+import { apiFetch, type Fetcher } from '$lib/api/client';
 import type {GameRead} from "$lib/api/types";
 
-export type F = typeof fetch;
+export type F = Fetcher;
 
 export class ApiError extends Error {
     status: number;
@@ -46,8 +46,6 @@ export async function getGames(
     },
     fetcher?: F
 ): Promise<{ items: GameRead[]; total: number }> {
-    const f = fetcher ?? fetch; // <= SAFE DEFAULT
-
     const qs = new URLSearchParams({
         scope: params.scope ?? 'all',
         limit: String(params.limit ?? 10),
@@ -57,9 +55,9 @@ export async function getGames(
         ...(params.player_id ? {player_id: String(params.player_id)} : {})
     });
 
-    const res = await f(`${PUBLIC_API_BASE}/api/games?${qs.toString()}`, {
+    const res = await apiFetch(`/games?${qs.toString()}`, {
         headers: {accept: 'application/json'}
-    });
+    }, fetcher);
     if (!res.ok) {
         throw new ApiError(
             res.status,
@@ -70,12 +68,11 @@ export async function getGames(
 }
 
 export async function createGame(data: unknown, fetcher?: F): Promise<GameRead> {
-    const f = fetcher ?? fetch;
-    const res = await f(`${PUBLIC_API_BASE}/api/games`, {
+    const res = await apiFetch('/games', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
-    });
+    }, fetcher);
     if (!res.ok) {
         throw new ApiError(
             res.status,
@@ -86,8 +83,7 @@ export async function createGame(data: unknown, fetcher?: F): Promise<GameRead> 
 }
 
 export async function getGame(id: number, fetcher?: F): Promise<GameRead> {
-    const f = fetcher ?? fetch;
-    const res = await f(`${PUBLIC_API_BASE}/api/games/${id}`);
+    const res = await apiFetch(`/games/${id}`, {}, fetcher);
     if (!res.ok) {
         throw new ApiError(
             res.status,
@@ -98,12 +94,11 @@ export async function getGame(id: number, fetcher?: F): Promise<GameRead> {
 }
 
 export async function updateGame(id: number, data: unknown, fetcher?: F): Promise<GameRead> {
-    const f = fetcher ?? fetch;
-    const res = await f(`${PUBLIC_API_BASE}/api/games/${id}`, {
+    const res = await apiFetch(`/games/${id}`, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
-    });
+    }, fetcher);
     if (!res.ok) {
         throw new ApiError(
             res.status,
@@ -114,9 +109,8 @@ export async function updateGame(id: number, data: unknown, fetcher?: F): Promis
 }
 
 export async function deleteGame(id: number, fetcher?: F): Promise<boolean> {
-    const f = fetcher ?? fetch;
-    const res = await f(`${PUBLIC_API_BASE}/api/games/${id}`, {
+    const res = await apiFetch(`/games/${id}`, {
         method: 'DELETE'
-    });
+    }, fetcher);
     return res.ok;
 }

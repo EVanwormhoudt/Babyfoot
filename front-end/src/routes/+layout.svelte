@@ -12,7 +12,6 @@
 	import {invalidateAll} from '$app/navigation';
 	import {getStoredCurrentPlayerId, setStoredCurrentPlayerId} from '$lib/current-player';
 	import {base} from '$app/paths';
-	import {PUBLIC_API_BASE} from '$env/static/public';
 
 	type HeaderPlayer = {
 		id: number;
@@ -118,7 +117,7 @@
 		const value = namesPassword.trim();
 		savingNamesPassword = true;
 		try {
-			const res = await fetch(`${PUBLIC_API_BASE}/api/privacy/names/session`, {
+			const res = await fetch('/api/privacy/names/session', {
 				method: value ? 'POST' : 'DELETE',
 				headers: value ? {'Content-Type': 'application/json'} : undefined,
 				body: value ? JSON.stringify({password: value}) : undefined,

@@ -1,8 +1,8 @@
 // src/lib/api/players.ts
-import {PUBLIC_API_BASE} from '$env/static/public';
+import { apiFetch, type Fetcher } from '$lib/api/client';
 
 export type Scope = 'monthly' | 'yearly' | 'overall';
-export type F = typeof fetch;
+export type F = Fetcher;
 export type LeaderboardOpts = { year?: number; month?: number };
 export type StatsOpts = { year?: number; month?: number };
 export type PlayerLite = {
@@ -60,9 +60,8 @@ async function readApiError(res: Response, fallback: string): Promise<string> {
 }
 
 export async function getPlayers(eventFetch?: F) {
-    const f = eventFetch ?? fetch;
     // If you can, add a fields param on the backend to keep this light
-    const res = await f(`${PUBLIC_API_BASE}/api/players`); // e.g. ...?fields=id,name,color,active
+    const res = await apiFetch('/players', {}, eventFetch); // e.g. ...?fields=id,name,color,active
     if (!res.ok) {
         throw new Error(await readApiError(res, 'Impossible de charger les joueurs'));
     }
@@ -70,12 +69,11 @@ export async function getPlayers(eventFetch?: F) {
 }
 
 export async function createPlayer(data: { player_name: string; player_color: string }, eventFetch?: F) {
-    const f = eventFetch ?? fetch;
-    const res = await f(`${PUBLIC_API_BASE}/api/players`, {
+    const res = await apiFetch('/players', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
-    });
+    }, eventFetch);
     if (!res.ok) {
         throw new Error(await readApiError(res, `Impossible de creer le joueur (${res.status})`));
     }
@@ -83,18 +81,16 @@ export async function createPlayer(data: { player_name: string; player_color: st
 }
 
 export async function getPlayer(id: number, eventFetch?: F) {
-    const f = eventFetch ?? fetch;
-    const res = await f(`${PUBLIC_API_BASE}/api/players/${id}`);
+    const res = await apiFetch(`/players/${id}`, {}, eventFetch);
     return res.json();
 }
 
 export async function updatePlayer(id: number, data: any, eventFetch?: F) {
-    const f = eventFetch ?? fetch;
-    const res = await f(`${PUBLIC_API_BASE}/api/players/${id}`, {
+    const res = await apiFetch(`/players/${id}`, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
-    });
+    }, eventFetch);
     if (!res.ok) {
         throw new Error(await readApiError(res, `Impossible de mettre a jour le joueur (${res.status})`));
     }
@@ -102,14 +98,12 @@ export async function updatePlayer(id: number, data: any, eventFetch?: F) {
 }
 
 export async function deletePlayer(id: number, eventFetch?: F) {
-    const f = eventFetch ?? fetch;
-    const res = await f(`${PUBLIC_API_BASE}/api/players/${id}`, {method: 'DELETE'});
+    const res = await apiFetch(`/players/${id}`, {method: 'DELETE'}, eventFetch);
     return res.ok;
 }
 
 export async function getPlayerHistory(id: number, eventFetch?: F) {
-    const f = eventFetch ?? fetch;
-    const res = await f(`${PUBLIC_API_BASE}/api/players/${id}/history`);
+    const res = await apiFetch(`/players/${id}/history`, {}, eventFetch);
     return res.json();
 }
 
@@ -136,10 +130,10 @@ export async function getPlayerRatingHistory(
     }
     const query = params.toString();
     const url = query
-        ? `${PUBLIC_API_BASE}/api/players/${id}/rating-history?${query}`
-        : `${PUBLIC_API_BASE}/api/players/${id}/rating-history`;
+        ? `/players/${id}/rating-history?${query}`
+        : `/players/${id}/rating-history`;
 
-    const res = await f(url);
+    const res = await apiFetch(url, {}, f);
     if (!res.ok) {
         throw new Error(`Impossible de charger l'historique Elo (${res.status})`);
     }
@@ -166,7 +160,7 @@ export async function getLeaderboard(
         params.set('month', String(opts.month));
     }
 
-    const res = await f(`${PUBLIC_API_BASE}/api/players/leaderboard?${params.toString()}`);
+    const res = await apiFetch(`/players/leaderboard?${params.toString()}`, {}, f);
     if (!res.ok) throw new Error(`Impossible de charger le classement : ${res.status}`);
     return res.json();
 }
@@ -190,7 +184,7 @@ export async function getPlayerStats(
         params.set('month', String(opts.month));
     }
 
-    const res = await f(`${PUBLIC_API_BASE}/api/players/${id}/stats?${params.toString()}`);
+    const res = await apiFetch(`/players/${id}/stats?${params.toString()}`, {}, f);
     if (!res.ok) {
         throw new Error(`Impossible de charger les statistiques joueur (${res.status})`);
     }

@@ -121,14 +121,13 @@ Useful environment variables:
 - `NAMES_PRIVACY_SESSION_MAX_AGE_SECONDS`: optional session lifetime for name-access cookies. Defaults to 30 days.
 - `NAMES_VISIBLE_IPS`: optional comma-separated IP/CIDR allowlist that can see player names, for example `192.0.2.10,198.51.100.0/24`.
 - `NAMES_TRUSTED_PROXY_IPS`: optional comma-separated IP/CIDR list of reverse proxies whose `X-Real-IP` or `X-Forwarded-For` headers may be trusted for `NAMES_VISIBLE_IPS`.
-- `PUBLIC_API_BASE`: browser-visible API base for the SvelteKit app.
-- `INTERNAL_API_BASE`: server-side API base used by SvelteKit inside Docker.
+- `INTERNAL_API_BASE`: server-side API base used by SvelteKit to proxy every browser `/api/...` request to FastAPI.
 
 When either `NAMES_PRIVACY_PASSWORD` or `NAMES_VISIBLE_IPS` is set, player names are replaced with placeholders unless the request comes from an allowlisted IP, includes the password in the `X-Names-Password` header, or has a valid backend-issued `HttpOnly` name-access session cookie. The frontend header includes a key button that posts the password to `/api/privacy/names/session`; the backend validates it and sets a signed cookie that JavaScript cannot read. Forwarded IP headers are ignored unless the immediate peer matches `NAMES_TRUSTED_PROXY_IPS`.
 
 Do not commit `.env`. It is ignored by git. If your Postgres password contains URL-reserved characters, URL-encode it in `DATABASE_URL`.
 
-If Cloudflare Tunnel points only at the SvelteKit frontend, keep `PUBLIC_API_BASE` empty and set `INTERNAL_API_BASE=http://fastapi:8000`. The frontend proxies `/api/...` requests to FastAPI and forwards Cloudflare's original visitor IP as a sanitized internal header. In that topology, put real allowed visitor IPs in `NAMES_VISIBLE_IPS`, and put the internal frontend/proxy network that connects to FastAPI in `NAMES_TRUSTED_PROXY_IPS`, for example `172.16.0.0/12` for Docker bridge networks.
+If Cloudflare Tunnel points only at the SvelteKit frontend, set `INTERNAL_API_BASE=http://fastapi:8000`. The frontend proxies every `/api/...` request to FastAPI and forwards Cloudflare's original visitor IP as a sanitized internal header. Keeping browser requests on this single origin ensures the name-access cookie is applied consistently on every page. In that topology, put real allowed visitor IPs in `NAMES_VISIBLE_IPS`, and put the internal frontend/proxy network that connects to FastAPI in `NAMES_TRUSTED_PROXY_IPS`, for example `172.16.0.0/12` for Docker bridge networks.
 
 ## Testing
 

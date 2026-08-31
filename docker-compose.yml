@@ -49,11 +49,8 @@ services:
     build:
       context: ./front-end
       dockerfile: Dockerfile
-      args:
-        PUBLIC_API_BASE: ${PUBLIC_API_BASE:-}
     container_name: foosball-frontend
     environment:
-      PUBLIC_API_BASE: ""
       INTERNAL_API_BASE: "http://fastapi:8000"
     depends_on:
       - fastapi

@@ -5,14 +5,13 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { PUBLIC_API_BASE } from '$env/static/public';
 	import { toast } from 'svelte-sonner';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 	import { getStoredCurrentPlayerId, onCurrentPlayerChange } from '$lib/current-player';
-	import { createGame, getGames } from '$lib/api/matches';
+	import { createGame, deleteGame, getGames } from '$lib/api/matches';
 	import type { GameRead, TeamRead } from '$lib/api/types';
 
 	type PlayerLite = {
@@ -269,9 +268,6 @@
 		teams: TeamCreatePayload[];
 	};
 
-	// endpoint base (public, browser-safe)
-	const API_BASE = $derived((PUBLIC_API_BASE ?? '').replace(/\/$/, ''));
-	const GAMES_ENDPOINT = $derived(`${API_BASE}/api/games`);
 	const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
 		day: '2-digit',
 		month: 'long',
@@ -290,22 +286,6 @@
 			currentPlayerId = playerId;
 		});
 	});
-
-	async function readApiError(res: Response, fallback: string): Promise<string> {
-		try {
-			const body = await res.json();
-			if (typeof body?.detail === 'string' && body.detail.trim()) return body.detail;
-		} catch {
-			// ignore non-JSON payloads
-		}
-		try {
-			const text = await res.text();
-			if (text.trim()) return text;
-		} catch {
-			// ignore empty/unreadable body
-		}
-		return fallback;
-	}
 
 	function buildTeamSignature(
 		teams: Array<TeamCreatePayload | TeamRead>,
@@ -396,11 +376,8 @@
 		}
 		const gameIdToCancel = lastGameId;
 		const cancelPromise = (async () => {
-			const res = await fetch(`${GAMES_ENDPOINT}/${gameIdToCancel}`, { method: 'DELETE' });
-			if (!res.ok) {
-				const msg = await readApiError(res, `Echec de l'annulation (${res.status})`);
-				throw new Error(msg);
-			}
+			const deleted = await deleteGame(gameIdToCancel);
+			if (!deleted) throw new Error("Echec de l'annulation.");
 		})();
 
 		toast.promise(cancelPromise, {
