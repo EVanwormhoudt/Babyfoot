@@ -127,7 +127,21 @@ When either `NAMES_PRIVACY_PASSWORD` or `NAMES_VISIBLE_IPS` is set, player names
 
 Do not commit `.env`. It is ignored by git. If your Postgres password contains URL-reserved characters, URL-encode it in `DATABASE_URL`.
 
-If Cloudflare Tunnel points only at the SvelteKit frontend, set `INTERNAL_API_BASE=http://fastapi:8000`. The frontend proxies every `/api/...` request to FastAPI and forwards Cloudflare's original visitor IP as a sanitized internal header. Keeping browser requests on this single origin ensures the name-access cookie is applied consistently on every page. In that topology, put real allowed visitor IPs in `NAMES_VISIBLE_IPS`, and put the internal frontend/proxy network that connects to FastAPI in `NAMES_TRUSTED_PROXY_IPS`, for example `172.16.0.0/12` for Docker bridge networks.
+When Cloudflare Tunnel points at the bundled Nginx service, Nginx accepts
+`CF-Connecting-IP` only from loopback or Docker-network peers and forwards that
+visitor address to FastAPI. Put real allowed visitor IPs or CIDRs in
+`NAMES_VISIBLE_IPS`, and trust the internal proxy network with
+`NAMES_TRUSTED_PROXY_IPS=172.16.0.0/12`. An exact IPv4 address can be listed as-is;
+use `/128` for one IPv6 address or an appropriate delegated prefix such as `/64`
+when the device portion rotates. Never put the Docker gateway (for example
+`172.18.0.1`) in `NAMES_VISIBLE_IPS`, because it is shared by visitors using the
+tunnel.
+
+If Cloudflare Tunnel points only at the SvelteKit frontend instead, set
+`INTERNAL_API_BASE=http://fastapi:8000`. The frontend proxies every `/api/...`
+request to FastAPI and forwards Cloudflare's original visitor IP as a sanitized
+internal header. Keeping browser requests on this single origin ensures the
+name-access cookie is applied consistently on every page.
 
 ## Testing
 

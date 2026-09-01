@@ -98,6 +98,20 @@ class NamesPrivacyTests(unittest.TestCase):
         ):
             self.assertTrue(privacy.can_see_names(request))
 
+    def test_allowed_cloudflare_ipv6_from_trusted_proxy_allows_names(self):
+        request = make_request(
+            headers={"x-real-ip": "2a01:cb09:d040:78e1:243e:798:a827:ceff"},
+            client_host="172.18.0.2",
+        )
+
+        with (
+            patch.object(privacy.settings, "NAMES_PRIVACY_PASSWORD", "secret"),
+            patch.object(privacy.settings, "NAMES_PRIVACY_SESSION_SECRET", "session-secret"),
+            patch.object(privacy.settings, "NAMES_VISIBLE_IPS", ["2a01:cb09:d040:78e1::/64"]),
+            patch.object(privacy.settings, "NAMES_TRUSTED_PROXY_IPS", ["172.16.0.0/12"]),
+        ):
+            self.assertTrue(privacy.can_see_names(request))
+
     def test_untrusted_forwarded_ip_does_not_allow_names(self):
         request = make_request(
             headers={"x-forwarded-for": "198.51.100.23"},
