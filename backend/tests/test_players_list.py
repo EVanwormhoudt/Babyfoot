@@ -41,6 +41,24 @@ def make_request() -> Request:
     "Project dependencies are missing",
 )
 class PlayerListTests(unittest.TestCase):
+    def test_list_players_pagination_is_stable(self):
+        engine = create_engine("sqlite:///:memory:")
+        SQLModel.metadata.create_all(engine)
+
+        with Session(engine) as session:
+            players = [
+                Player(player_name=f"Player {index}", player_color="#0f0", active=True)
+                for index in range(3)
+            ]
+            session.add_all(players)
+            session.commit()
+
+            first_page = list_players(make_request(), limit=2, offset=0, session=session)
+            second_page = list_players(make_request(), limit=2, offset=2, session=session)
+
+        self.assertEqual([player.id for player in first_page], [players[0].id, players[1].id])
+        self.assertEqual([player.id for player in second_page], [players[2].id])
+
     def test_list_players_includes_latest_game_timestamp(self):
         engine = create_engine("sqlite:///:memory:")
         SQLModel.metadata.create_all(engine)

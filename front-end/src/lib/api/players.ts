@@ -60,12 +60,21 @@ async function readApiError(res: Response, fallback: string): Promise<string> {
 }
 
 export async function getPlayers(eventFetch?: F) {
-    // If you can, add a fields param on the backend to keep this light
-    const res = await apiFetch('/players', {}, eventFetch); // e.g. ...?fields=id,name,color,active
-    if (!res.ok) {
-        throw new Error(await readApiError(res, 'Impossible de charger les joueurs'));
+    const pageSize = 200;
+    const players: PlayerLite[] = [];
+
+    for (let offset = 0; ; offset += pageSize) {
+        const res = await apiFetch(`/players?limit=${pageSize}&offset=${offset}`, {}, eventFetch);
+        if (!res.ok) {
+            throw new Error(await readApiError(res, 'Impossible de charger les joueurs'));
+        }
+
+        const page = await res.json() as PlayerLite[];
+        players.push(...page);
+        if (page.length < pageSize) break;
     }
-    return res.json() as Promise<PlayerLite[]>;
+
+    return players;
 }
 
 export async function createPlayer(data: { player_name: string; player_color: string }, eventFetch?: F) {

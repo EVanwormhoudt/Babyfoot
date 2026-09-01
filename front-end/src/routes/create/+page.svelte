@@ -53,7 +53,11 @@
 		return cutoff.getTime();
 	})();
 	let currentPlayerId = $state<number | null>(null);
-	let dormantPlayersExpanded = $state(false);
+	// A newly created player has no match timestamp and lands in this section.
+	// Open it initially so new players are visible without a hidden extra step.
+	let dormantPlayersExpanded = $state(
+		playersLite.some((player) => player.active !== false && !player.last_game_timestamp)
+	);
 	let normalizeAvailableColumnsTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function normalizeItem(player: PlayerLite): DndItem {

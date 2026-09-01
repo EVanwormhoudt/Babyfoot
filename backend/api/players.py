@@ -238,6 +238,7 @@ def list_players(
         select(Player, latest_game_sq.c.last_game_timestamp)
         .join(latest_game_sq, latest_game_sq.c.player_id == Player.id, isouter=True)
         .options(selectinload(Player.rating))
+        .order_by(Player.id.asc())
         .offset(offset)
         .limit(limit)
     )
