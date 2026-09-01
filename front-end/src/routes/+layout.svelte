@@ -9,8 +9,12 @@
 	import {Toaster} from '$lib/components/ui/sonner';
 	import {toast} from 'svelte-sonner';
 	import {navigating, page} from '$app/state';
-	import {invalidateAll} from '$app/navigation';
-	import {getStoredCurrentPlayerId, setStoredCurrentPlayerId} from '$lib/current-player';
+	import {afterNavigate, invalidateAll} from '$app/navigation';
+	import {
+		getStoredCurrentPlayerId,
+		onCurrentPlayerChange,
+		setStoredCurrentPlayerId
+	} from '$lib/current-player';
 	import {base} from '$app/paths';
 
 	type HeaderPlayer = {
@@ -66,6 +70,7 @@
 	const lightFaviconHref = `${base}/foosball_light.png`;
 	const darkFaviconHref = `${base}/foosball.png`;
 	let faviconObserver: MutationObserver | null = null;
+	let syncingPrivacySession = false;
 
 	function isActive(href: string) {
 		const pathname = page.url.pathname;
@@ -139,6 +144,28 @@
 		}
 	}
 
+	async function syncPrivacySession() {
+		if (syncingPrivacySession) return;
+		syncingPrivacySession = true;
+		try {
+			const res = await fetch('/api/privacy/names/session', {credentials: 'include'});
+			if (!res.ok) return;
+			const current = (await res.json()) as NamesPrivacySession;
+			if (
+				current.configured !== data.privacySession?.configured ||
+				current.can_see_names !== data.privacySession?.can_see_names
+			) {
+				await invalidateAll();
+			}
+		} finally {
+			syncingPrivacySession = false;
+		}
+	}
+
+	afterNavigate(() => {
+		void syncPrivacySession();
+	});
+
 	function syncFaviconWithTheme() {
 		if (typeof document === 'undefined') return;
 		const favicon = document.getElementById('app-favicon') as HTMLLinkElement | null;
@@ -170,6 +197,20 @@
 		pendingWhoAmI = '';
 		showWhoAmIModal = true;
 	});
+
+	onMount(() =>
+		onCurrentPlayerChange((playerId) => {
+			const nextId = playerId ? String(playerId) : '';
+			if (
+				nextId &&
+				!selectablePlayers.some((player: HeaderPlayer) => String(player.id) === nextId)
+			) {
+				return;
+			}
+			mePlayerId = nextId;
+			pendingWhoAmI = nextId;
+		})
+	);
 
 	onMount(() => {
 		syncFaviconWithTheme();

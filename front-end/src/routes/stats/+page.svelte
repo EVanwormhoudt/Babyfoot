@@ -5,7 +5,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import type { PlayerRatingHistoryPoint, PlayerStats, Scope } from '$lib/api/players';
 	import type { PageData } from './$types';
-	import { getStoredCurrentPlayerId } from '$lib/current-player';
+	import { getStoredCurrentPlayerId, onCurrentPlayerChange } from '$lib/current-player';
 
 	type ChartPoint = {
 		x: number;
@@ -182,6 +182,19 @@
 		selectedPlayerId = String(storedId);
 		applyFilters();
 	});
+
+	onMount(() =>
+		onCurrentPlayerChange((playerId) => {
+			if (!playerId || String(playerId) === selectedPlayerId) return;
+			if (!data.players.some((player: { id: number }) => player.id === playerId)) return;
+
+			selectedPlayerId = String(playerId);
+			if (selectedComparePlayerId === selectedPlayerId) {
+				selectedComparePlayerId = '';
+			}
+			applyFilters();
+		})
+	);
 
 	function percent(value: number) {
 		return `${(value * 100).toFixed(1)}%`;

@@ -42,5 +42,15 @@ export function onCurrentPlayerChange(handler: (playerId: number | null) => void
     };
 
     window.addEventListener(CURRENT_PLAYER_EVENT, listener as EventListener);
-    return () => window.removeEventListener(CURRENT_PLAYER_EVENT, listener as EventListener);
+    const storageListener = (event: StorageEvent) => {
+        if (event.key === CURRENT_PLAYER_STORAGE_KEY) {
+            handler(normalizePlayerId(event.newValue));
+        }
+    };
+    window.addEventListener("storage", storageListener);
+
+    return () => {
+        window.removeEventListener(CURRENT_PLAYER_EVENT, listener as EventListener);
+        window.removeEventListener("storage", storageListener);
+    };
 }
