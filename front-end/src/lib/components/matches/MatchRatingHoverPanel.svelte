@@ -7,7 +7,7 @@
 	let { game, class: className = '' } = $props<{ game: GameRead; class?: string }>();
 
 	const ratingTypes: Array<{ key: RatingType; label: string }> = [
-		{ key: 'overall', label: 'General' },
+		{ key: 'overall', label: 'Général' },
 		{ key: 'monthly', label: 'Mensuel' },
 		{ key: 'yearly', label: 'Annuel' }
 	];
@@ -46,7 +46,7 @@
 	}
 
 	function teamHeading(teamNumber: TeamNumber) {
-		return teamNumber === 1 ? 'Equipe rouge' : 'Equipe bleue';
+		return teamNumber === 1 ? 'Équipe rouge' : 'Équipe bleue';
 	}
 
 	function teamTone(teamNumber: TeamNumber) {
@@ -61,11 +61,11 @@
 </script>
 
 <div
-	class={`grid gap-3 rounded-2xl border border-border/70 bg-[hsl(var(--surface-container-low)/0.78)] p-3 sm:p-4 lg:grid-cols-2 ${className}`}
+	class={`grid grid-cols-[minmax(0,1fr)] gap-3 rounded-2xl border border-border/70 bg-[hsl(var(--surface-container-low)/0.78)] p-3 sm:p-4 lg:grid-cols-2 ${className}`}
 >
 	{#each teamNumbers as teamNumber}
 		{@const players = teamPlayers(teamNumber)}
-		<section class={`rounded-xl border p-3 ${teamTone(teamNumber)}`}>
+		<section class={`min-w-0 rounded-xl border p-3 ${teamTone(teamNumber)}`}>
 			<div class="mb-3 flex items-start justify-between gap-3">
 				<div class="min-w-0">
 					<p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -85,7 +85,27 @@
 			</div>
 
 			{#if players.length}
-				<div class="overflow-x-auto">
+				<div class="divide-y divide-border/50 sm:hidden">
+					{#each players as team (team.player_id)}
+						<div class="py-3">
+							<p class="break-words text-sm font-semibold">{teamName(team)}</p>
+							<div class="mt-3 grid grid-cols-3 gap-2 text-xs">
+								{#each ratingTypes as ratingType}
+									{@const change = changeFor(team.player_id, ratingType.key)}
+									{@const delta = typeof change?.delta_mu === 'number' ? change.delta_mu : null}
+									<div>
+										<p class="text-[10px] text-muted-foreground">{ratingType.label}</p>
+										<p class={`mt-1 font-semibold ${deltaClass(delta)}`}>{deltaLabel(delta)}</p>
+										<p class="mt-1 text-muted-foreground">
+											{ratingLabel(typeof change?.mu_after === 'number' ? change.mu_after : null)}
+										</p>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</div>
+				<div class="hidden overflow-x-auto sm:block">
 					<table class="min-w-full text-xs sm:text-sm">
 						<thead class="text-left text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
 							<tr>

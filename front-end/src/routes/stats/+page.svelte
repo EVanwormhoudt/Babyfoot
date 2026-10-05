@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ClubPageHeader from '$lib/components/ClubPageHeader.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
@@ -104,20 +105,21 @@
 	let selectedYear = $state(String(data.selectedYear));
 	let selectedMonth = $state(String(data.selectedMonth));
 	let hoveredPointRef = $state<HoveredPointRef | null>(null);
+	let chartWidth = $state(760);
 
 	const monthOptions = [
 		{ value: 1, label: 'Janvier' },
-		{ value: 2, label: 'Fevrier' },
+		{ value: 2, label: 'Février' },
 		{ value: 3, label: 'Mars' },
 		{ value: 4, label: 'Avril' },
 		{ value: 5, label: 'Mai' },
 		{ value: 6, label: 'Juin' },
 		{ value: 7, label: 'Juillet' },
-		{ value: 8, label: 'Aout' },
+		{ value: 8, label: 'Août' },
 		{ value: 9, label: 'Septembre' },
 		{ value: 10, label: 'Octobre' },
 		{ value: 11, label: 'Novembre' },
-		{ value: 12, label: 'Decembre' }
+		{ value: 12, label: 'Décembre' }
 	];
 
 	const selectedPlayer = $derived(
@@ -139,7 +141,7 @@
 		if (selectedScope === 'yearly') {
 			return selectedYear;
 		}
-		return 'General';
+		return 'Général';
 	});
 
 	function applyFilters() {
@@ -266,7 +268,7 @@
 	}
 
 	function matchOutcomeClass(outcome: RecentMatchOutcome): string {
-		if (outcome === 'win') return 'tone-positive bg-emerald-500/10';
+		if (outcome === 'win') return 'tone-positive bg-accent/10';
 		if (outcome === 'loss') return 'tone-negative bg-red-500/10';
 		if (outcome === 'draw') return 'bg-muted text-muted-foreground';
 		return 'bg-muted text-muted-foreground';
@@ -282,7 +284,7 @@
 	function formatMatchDate(value: string): string {
 		const parsed = new Date(value);
 		if (Number.isNaN(parsed.getTime())) return value;
-		return parsed.toLocaleString(undefined, {
+		return parsed.toLocaleString('fr-FR', {
 			day: '2-digit',
 			month: 'short',
 			year: 'numeric',
@@ -300,7 +302,7 @@
 
 		return [
 			{
-				label: 'Matchs joues',
+				label: 'Matchs joués',
 				primary: fixed(data.stats.games_played),
 				comparison: fixed(data.comparisonStats.games_played),
 				delta: numericDelta(data.stats.games_played, data.comparisonStats.games_played)
@@ -318,7 +320,7 @@
 				delta: percentPointDelta(data.stats.win_rate, data.comparisonStats.win_rate)
 			},
 			{
-				label: 'Score moyen equipe',
+				label: 'Score moyen équipe',
 				primary: fixed(data.stats.average_team_score, 2),
 				comparison: fixed(data.comparisonStats.average_team_score, 2),
 				delta: numericDelta(
@@ -338,25 +340,25 @@
 				)
 			},
 			{
-				label: 'Serie actuelle',
+				label: 'Série actuelle',
 				primary: fixed(data.stats.current_win_streak),
 				comparison: fixed(data.comparisonStats.current_win_streak),
 				delta: numericDelta(data.stats.current_win_streak, data.comparisonStats.current_win_streak)
 			},
 			{
-				label: 'Plus longue serie',
+				label: 'Plus longue série',
 				primary: fixed(data.stats.longest_win_streak),
 				comparison: fixed(data.comparisonStats.longest_win_streak),
 				delta: numericDelta(data.stats.longest_win_streak, data.comparisonStats.longest_win_streak)
 			},
 			{
-				label: 'Meilleur coequipier',
+				label: 'Meilleur coéquipier',
 				primary: teammateLabel(data.stats.best_teammate),
 				comparison: teammateLabel(data.comparisonStats.best_teammate),
 				delta: '-'
 			},
 			{
-				label: 'Pire coequipier',
+				label: 'Pire coéquipier',
 				primary: teammateLabel(data.stats.worst_teammate),
 				comparison: teammateLabel(data.comparisonStats.worst_teammate),
 				delta: '-'
@@ -376,13 +378,13 @@
 	function scopeToLabel(scope: Scope): string {
 		if (scope === 'monthly') return 'Mensuel';
 		if (scope === 'yearly') return 'Annuel';
-		return 'General';
+		return 'Général';
 	}
 
 	function formatDate(value: string): string {
 		const parsed = new Date(value);
 		if (Number.isNaN(parsed.getTime())) return value;
-		return parsed.toLocaleDateString(undefined, {
+		return parsed.toLocaleDateString('fr-FR', {
 			day: '2-digit',
 			month: 'short',
 			year: 'numeric'
@@ -392,7 +394,7 @@
 	function formatTimestamp(value: number): string {
 		const parsed = new Date(value);
 		if (Number.isNaN(parsed.getTime())) return '';
-		return parsed.toLocaleDateString(undefined, {
+		return parsed.toLocaleDateString('fr-FR', {
 			day: '2-digit',
 			month: 'short',
 			year: 'numeric'
@@ -412,8 +414,8 @@
 	}
 
 	function buildHistoryChart(inputs: ChartSeriesInput[]): ChartModel {
-		const width = 760;
-		const height = 290;
+		const width = Math.max(260, chartWidth);
+		const height = width < 500 ? 220 : 290;
 		const left = 56;
 		const right = 18;
 		const top = 20;
@@ -561,8 +563,8 @@
 				key: 'primary',
 				name: selectedPlayerName,
 				history: data.ratingHistory ?? [],
-				color: '#16a34a',
-				strongColor: '#15803d',
+				color: '#7fcf5a',
+				strongColor: '#477b2e',
 				fillTop: 'rgba(34, 197, 94, 0.28)',
 				fillBottom: 'rgba(34, 197, 94, 0.02)',
 				gradientId: 'rating-history-primary-fill'
@@ -573,8 +575,8 @@
 							key: 'comparison' as const,
 							name: selectedComparePlayerName,
 							history: data.comparisonRatingHistory ?? [],
-							color: '#2563eb',
-							strongColor: '#1d4ed8',
+							color: '#007fb1',
+							strongColor: '#00658d',
 							fillTop: 'rgba(37, 99, 235, 0.18)',
 							fillBottom: 'rgba(37, 99, 235, 0.02)',
 							gradientId: 'rating-history-comparison-fill'
@@ -667,25 +669,31 @@
 					if (x + width > chart.rightX) {
 						x = hoveredPoint.x - width - 12;
 					}
+					x = Math.max(4, Math.min(x, chart.width - width - 4));
 					let y = hoveredPoint.y - height - 12;
 					if (y < chart.topY + 4) {
 						y = hoveredPoint.y + 12;
 					}
+					y = Math.max(4, Math.min(y, chart.height - height - 4));
 					return { x, y, width, height };
 				})()
 			: null
 	);
 </script>
 
-<section class="space-y-6 p-8">
-	<h2 class="text-3xl font-semibold">Statistiques</h2>
+<section class="mx-auto max-w-[1400px] space-y-6 px-4 py-6">
+	<ClubPageHeader
+		eyebrow="Performances"
+		title="Votre jeu, en chiffres."
+		description="Analysez votre progression et comparez les performances du club."
+	/>
 
 	{#if data.players.length === 0}
 		<Card>
-			<CardContent class="py-8 text-center text-muted-foreground">Aucun joueur trouve.</CardContent>
+			<CardContent class="py-8 text-center text-muted-foreground">Aucun joueur trouvé.</CardContent>
 		</Card>
 	{:else}
-		<div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+		<div class="club-filter-bar grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
 			<label class="flex flex-col gap-2">
 				<span class="text-sm text-muted-foreground">Joueur</span>
 				<select
@@ -716,13 +724,13 @@
 			</label>
 
 			<label class="flex flex-col gap-2">
-				<span class="text-sm text-muted-foreground">Periode</span>
+				<span class="text-sm text-muted-foreground">Période</span>
 				<select
 					bind:value={selectedScope}
 					class="h-10 rounded-md border bg-background px-3 text-sm"
 					onchange={applyFilters}
 				>
-					<option value="overall">General</option>
+					<option value="overall">Général</option>
 					<option value="monthly">Mensuel</option>
 					<option value="yearly">Annuel</option>
 				</select>
@@ -730,7 +738,7 @@
 
 			{#if selectedScope === 'monthly' || selectedScope === 'yearly'}
 				<label class="flex flex-col gap-2">
-					<span class="text-sm text-muted-foreground">Annee</span>
+					<span class="text-sm text-muted-foreground">Année</span>
 					<select
 						bind:value={selectedYear}
 						class="h-10 rounded-md border bg-background px-3 text-sm"
@@ -776,7 +784,27 @@
 				</CardHeader>
 				<CardContent class="text-sm">
 					{#if hasComparison}
-						<div class="overflow-x-auto rounded-md border">
+						<div class="divide-y md:hidden">
+							{#each comparisonRows as row (row.label)}
+								<div class="space-y-3 py-4">
+									<p class="font-semibold">{row.label}</p>
+									<div class="grid grid-cols-2 gap-4">
+										<div class="min-w-0">
+											<p class="break-words text-xs text-muted-foreground">{selectedPlayerName}</p>
+											<p class="mt-1 break-words font-semibold">{row.primary}</p>
+										</div>
+										<div class="min-w-0">
+											<p class="break-words text-xs text-muted-foreground">
+												{selectedComparePlayerName}
+											</p>
+											<p class="mt-1 break-words font-semibold">{row.comparison}</p>
+										</div>
+									</div>
+									<p class="text-xs text-muted-foreground">Écart : {row.delta}</p>
+								</div>
+							{/each}
+						</div>
+						<div class="hidden overflow-x-auto rounded-md border md:block">
 							<div class="min-w-[680px] divide-y">
 								<div
 									class="grid grid-cols-[1.1fr_0.9fr_0.9fr_0.55fr] gap-3 bg-muted/40 px-3 py-2 text-xs font-semibold uppercase text-muted-foreground"
@@ -797,9 +825,9 @@
 							</div>
 						</div>
 					{:else}
-						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						<div class="club-stat-metrics grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 							<div class="rounded-md border p-3">
-								<div class="text-muted-foreground">Matchs joues</div>
+								<div class="text-muted-foreground">Matchs joués</div>
 								<div class="text-2xl font-semibold">{data.stats.games_played}</div>
 							</div>
 							<div class="rounded-md border p-3">
@@ -811,7 +839,7 @@
 								<div class="text-2xl font-semibold">{percent(data.stats.win_rate)}</div>
 							</div>
 							<div class="rounded-md border p-3">
-								<div class="text-muted-foreground">Score moyen equipe</div>
+								<div class="text-muted-foreground">Score moyen équipe</div>
 								<div class="text-2xl font-semibold">{data.stats.average_team_score.toFixed(2)}</div>
 							</div>
 							<div class="rounded-md border p-3">
@@ -821,21 +849,21 @@
 								</div>
 							</div>
 							<div class="rounded-md border p-3">
-								<div class="text-muted-foreground">Serie actuelle</div>
+								<div class="text-muted-foreground">Série actuelle</div>
 								<div class="text-2xl font-semibold">{data.stats.current_win_streak}</div>
 							</div>
 							<div class="rounded-md border p-3">
-								<div class="text-muted-foreground">Plus longue serie</div>
+								<div class="text-muted-foreground">Plus longue série</div>
 								<div class="text-2xl font-semibold">{data.stats.longest_win_streak}</div>
 							</div>
 							<div class="rounded-md border p-3">
-								<div class="text-muted-foreground">Meilleur coequipier</div>
+								<div class="text-muted-foreground">Meilleur coéquipier</div>
 								<div class="text-base font-medium">
 									{teammateLabel(data.stats.best_teammate)}
 								</div>
 							</div>
 							<div class="rounded-md border p-3">
-								<div class="text-muted-foreground">Pire coequipier</div>
+								<div class="text-muted-foreground">Pire coéquipier</div>
 								<div class="text-base font-medium">
 									{teammateLabel(data.stats.worst_teammate)}
 								</div>
@@ -873,7 +901,7 @@
 				<CardContent>
 					{#if data.recentMatches.length === 0}
 						<div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-							Aucun match recent pour ce joueur.
+							Aucun match récent pour ce joueur.
 						</div>
 					{:else}
 						<div class="divide-y rounded-md border">
@@ -897,12 +925,14 @@
 											>
 												{matchOutcomeLabel(outcome)}
 											</span>
-											<span class="text-xs text-muted-foreground">{formatMatchDate(match.game_timestamp)}</span>
+											<span class="text-xs text-muted-foreground"
+												>{formatMatchDate(match.game_timestamp)}</span
+											>
 											<span class="text-xs text-muted-foreground">#{match.id}</span>
 										</div>
 										<div class="grid gap-1.5">
 											<div class="min-w-0 font-medium">
-												<span class="text-muted-foreground">Equipe</span>
+												<span class="text-muted-foreground">Équipe</span>
 												<span class="break-words">{teamLabel(match, playerTeam)}</span>
 											</div>
 											<div class="min-w-0">
@@ -916,7 +946,7 @@
 											<div class="text-2xl font-semibold tabular-nums">
 												{playerScore ?? '-'} - {otherScore ?? '-'}
 											</div>
-											<div class="text-xs text-muted-foreground">score equipe</div>
+											<div class="text-xs text-muted-foreground">score équipe</div>
 										</div>
 										{#if delta !== null}
 											<div
@@ -978,7 +1008,7 @@
 								: `Historique Elo de ${selectedPlayerName} (${selectedScopeLabel})`}
 						</CardTitle>
 						<p class="text-xs text-muted-foreground">
-							Evolution de l'Elo sur les snapshots enregistres
+							Évolution de l'Elo sur les snapshots enregistrés
 						</p>
 						<div class="flex flex-wrap gap-3 text-xs">
 							{#each chart.series as series (series.key)}
@@ -995,147 +1025,160 @@
 					</div>
 				</CardHeader>
 				<CardContent class="space-y-3">
-					<svg
-						class="h-72 w-full"
-						viewBox={`0 0 ${chart.width} ${chart.height}`}
-						preserveAspectRatio="xMinYMin meet"
-						role="img"
-						aria-label={chart.series.length > 1
-							? `Graphique d'historique Elo de ${selectedPlayerName} et ${selectedComparePlayerName}`
-							: `Graphique d'historique Elo de ${selectedPlayerName}`}
-						onpointermove={handleChartPointerMove}
-						onpointerleave={() => (hoveredPointRef = null)}
-					>
-						<defs>
-							{#each chart.series as series (series.key)}
-								<linearGradient id={series.gradientId} x1="0" y1="0" x2="0" y2="1">
-									<stop offset="0%" stop-color={series.fillTop}></stop>
-									<stop offset="100%" stop-color={series.fillBottom}></stop>
-								</linearGradient>
-							{/each}
-						</defs>
-						<rect
-							x={chart.leftX}
-							y={chart.topY}
-							width={chart.rightX - chart.leftX}
-							height={chart.bottomY - chart.topY}
-							rx="12"
-							fill="hsl(var(--muted))"
-							opacity="0.25"
-						/>
-						{#each chart.yTicks as tick (tick.value)}
-							<line
-								x1={chart.leftX}
-								y1={tick.y}
-								x2={chart.rightX}
-								y2={tick.y}
-								stroke="hsl(var(--border))"
-								stroke-width="1"
-								stroke-dasharray={tick.y === chart.bottomY ? undefined : '4 4'}
+					<div bind:clientWidth={chartWidth}>
+						<svg
+							class="club-rating-chart w-full"
+							style={`aspect-ratio: ${chart.width} / ${chart.height}`}
+							viewBox={`0 0 ${chart.width} ${chart.height}`}
+							preserveAspectRatio="xMinYMin meet"
+							role="img"
+							aria-label={chart.series.length > 1
+								? `Graphique d'historique Elo de ${selectedPlayerName} et ${selectedComparePlayerName}`
+								: `Graphique d'historique Elo de ${selectedPlayerName}`}
+							onpointermove={handleChartPointerMove}
+							onpointerleave={() => (hoveredPointRef = null)}
+						>
+							<defs>
+								{#each chart.series as series (series.key)}
+									<linearGradient id={series.gradientId} x1="0" y1="0" x2="0" y2="1">
+										<stop offset="0%" stop-color={series.fillTop}></stop>
+										<stop offset="100%" stop-color={series.fillBottom}></stop>
+									</linearGradient>
+								{/each}
+							</defs>
+							<rect
+								x={chart.leftX}
+								y={chart.topY}
+								width={chart.rightX - chart.leftX}
+								height={chart.bottomY - chart.topY}
+								rx="12"
+								fill="hsl(var(--muted))"
+								opacity="0.25"
 							/>
-							<text
-								x={chart.leftX - 8}
-								y={tick.y + 4}
-								text-anchor="end"
-								fill="hsl(var(--muted-foreground))"
-								class="text-[10px]"
-							>
-								{tick.value.toFixed(0)}
-							</text>
-						{/each}
-						{#each chart.series as series (series.key)}
-							<path
-								d={series.areaPath}
-								fill={`url(#${series.gradientId})`}
-								stroke="none"
-								opacity={chart.series.length > 1 ? '0.72' : '1'}
-							/>
-						{/each}
-						{#each chart.series as series (series.key)}
-							<path
-								d={series.path}
-								fill="none"
-								stroke={series.color}
-								stroke-width="7"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								opacity="0.14"
-							/>
-							<path
-								d={series.path}
-								fill="none"
-								stroke={series.color}
-								stroke-width="3"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-							/>
-						{/each}
-						{#if hoveredPoint && hoveredSeries}
-							<line
-								x1={hoveredPoint.x}
-								y1={chart.topY}
-								x2={hoveredPoint.x}
-								y2={chart.bottomY}
-								stroke={hoveredSeries.color}
-								stroke-width="1"
-								stroke-dasharray="4 4"
-								opacity="0.7"
-							/>
-							<circle
-								cx={hoveredPoint.x}
-								cy={hoveredPoint.y}
-								r="4"
-								fill={hoveredSeries.color}
-								stroke="hsl(var(--background))"
-								stroke-width="2"
-							/>
-						{/if}
-						{#each chart.xTicks as tick (tick.x)}
-							<text
-								x={tick.x}
-								y={chart.height - 14}
-								text-anchor="middle"
-								fill="hsl(var(--muted-foreground))"
-								class="text-[10px]"
-							>
-								{tick.label}
-							</text>
-						{/each}
-						{#if hoveredPoint && hoveredSeries && tooltipBox}
-							<g transform={`translate(${tooltipBox.x}, ${tooltipBox.y})`}>
-								<rect
-									width={tooltipBox.width}
-									height={tooltipBox.height}
-									rx="10"
-									fill="hsl(var(--background))"
-									stroke={hoveredSeries.strongColor}
-									stroke-width="1.5"
-									opacity="0.97"
+							{#each chart.yTicks as tick (tick.value)}
+								<line
+									x1={chart.leftX}
+									y1={tick.y}
+									x2={chart.rightX}
+									y2={tick.y}
+									stroke="hsl(var(--border))"
+									stroke-width="1"
+									stroke-dasharray={tick.y === chart.bottomY ? undefined : '4 4'}
 								/>
-								<text x="12" y="20" fill="hsl(var(--foreground))" class="text-[11px] font-semibold">
-									{hoveredSeries.name}
+								<text
+									x={chart.leftX - 8}
+									y={tick.y + 4}
+									text-anchor="end"
+									fill="hsl(var(--muted-foreground))"
+									class="text-[10px]"
+								>
+									{tick.value.toFixed(0)}
 								</text>
-								<text x="12" y="38" fill="hsl(var(--foreground))" class="text-[11px] font-semibold">
-									{hoveredPoint.dateLabel}
+							{/each}
+							{#each chart.series as series (series.key)}
+								<path
+									d={series.areaPath}
+									fill={`url(#${series.gradientId})`}
+									stroke="none"
+									opacity={chart.series.length > 1 ? '0.72' : '1'}
+								/>
+							{/each}
+							{#each chart.series as series (series.key)}
+								<path
+									d={series.path}
+									fill="none"
+									stroke={series.color}
+									stroke-width="7"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									opacity="0.14"
+								/>
+								<path
+									d={series.path}
+									fill="none"
+									stroke={series.color}
+									stroke-width="3"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								/>
+							{/each}
+							{#if hoveredPoint && hoveredSeries}
+								<line
+									x1={hoveredPoint.x}
+									y1={chart.topY}
+									x2={hoveredPoint.x}
+									y2={chart.bottomY}
+									stroke={hoveredSeries.color}
+									stroke-width="1"
+									stroke-dasharray="4 4"
+									opacity="0.7"
+								/>
+								<circle
+									cx={hoveredPoint.x}
+									cy={hoveredPoint.y}
+									r="4"
+									fill={hoveredSeries.color}
+									stroke="hsl(var(--background))"
+									stroke-width="2"
+								/>
+							{/if}
+							{#each chart.xTicks as tick (tick.x)}
+								<text
+									x={tick.x}
+									y={chart.height - 14}
+								text-anchor={tick.x === chart.leftX ? 'start' : tick.x === chart.rightX ? 'end' : 'middle'}
+									fill="hsl(var(--muted-foreground))"
+									class="text-[10px]"
+								>
+									{tick.label}
 								</text>
-								<text x="12" y="56" fill="hsl(var(--muted-foreground))" class="text-[11px]">
-									Valeur : {muAmount(hoveredPoint.mu)}
-								</text>
-								<text x="12" y="72" fill="hsl(var(--muted-foreground))" class="text-[11px]">
-									Rang : {hoveredPoint.rank} ({scopeToLabel(hoveredPoint.rankType)})
-								</text>
-								<text x="12" y="88" fill="hsl(var(--muted-foreground))" class="text-[11px]">
-									Sigma: {hoveredPoint.sigma === null ? '—' : hoveredPoint.sigma.toFixed(1)}
-								</text>
-								<text x="12" y="104" fill="hsl(var(--muted-foreground))" class="text-[11px]">
-									Δ precedent : {hoveredDelta === null ? '—' : signed(hoveredDelta)}
-								</text>
-							</g>
-						{/if}
-					</svg>
+							{/each}
+							{#if hoveredPoint && hoveredSeries && tooltipBox}
+								<g transform={`translate(${tooltipBox.x}, ${tooltipBox.y})`}>
+									<rect
+										width={tooltipBox.width}
+										height={tooltipBox.height}
+										rx="10"
+										fill="hsl(var(--background))"
+										stroke={hoveredSeries.strongColor}
+										stroke-width="1.5"
+										opacity="0.97"
+									/>
+									<text
+										x="12"
+										y="20"
+										fill="hsl(var(--foreground))"
+										class="text-[11px] font-semibold"
+									>
+										{hoveredSeries.name}
+									</text>
+									<text
+										x="12"
+										y="38"
+										fill="hsl(var(--foreground))"
+										class="text-[11px] font-semibold"
+									>
+										{hoveredPoint.dateLabel}
+									</text>
+									<text x="12" y="56" fill="hsl(var(--muted-foreground))" class="text-[11px]">
+										Valeur : {muAmount(hoveredPoint.mu)}
+									</text>
+									<text x="12" y="72" fill="hsl(var(--muted-foreground))" class="text-[11px]">
+										Rang : {hoveredPoint.rank} ({scopeToLabel(hoveredPoint.rankType)})
+									</text>
+									<text x="12" y="88" fill="hsl(var(--muted-foreground))" class="text-[11px]">
+										Sigma: {hoveredPoint.sigma === null ? '—' : hoveredPoint.sigma.toFixed(1)}
+									</text>
+									<text x="12" y="104" fill="hsl(var(--muted-foreground))" class="text-[11px]">
+										Δ précédent : {hoveredDelta === null ? '—' : signed(hoveredDelta)}
+									</text>
+								</g>
+							{/if}
+						</svg>
+					</div>
 					<div class="flex items-center justify-between text-xs text-muted-foreground">
 						<span>{chart.startDate}</span>
-						<span class="rounded-full border border-border/60 px-2 py-0.5">Periode</span>
+						<span class="rounded-full border border-border/60 px-2 py-0.5">Période</span>
 						<span>{chart.endDate}</span>
 					</div>
 					{#if chart.series.length > 1}

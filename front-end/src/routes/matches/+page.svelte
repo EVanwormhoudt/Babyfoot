@@ -1,4 +1,12 @@
 <script lang="ts">
+	import ClubPageHeader from '$lib/components/ClubPageHeader.svelte';
+	import MoreHorizontal from '@lucide/svelte/icons/ellipsis';
+	import Pencil from '@lucide/svelte/icons/pencil';
+	import Trash from '@lucide/svelte/icons/trash-2';
+	import CalendarDays from '@lucide/svelte/icons/calendar-days';
+	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -43,7 +51,7 @@
 	}
 
 	function toTime(dt: string) {
-		return new Date(dt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+		return new Date(dt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 	}
 
 	// build/merge query params for navigation without losing others
@@ -85,7 +93,7 @@
 		if (diffDays === 0) return "Aujourd'hui";
 		if (diffDays === 1) return 'Hier';
 
-		return target.toLocaleDateString(undefined, {
+		return target.toLocaleDateString('fr-FR', {
 			weekday: 'long',
 			day: '2-digit',
 			month: 'long',
@@ -287,7 +295,7 @@
 		sp.delete('player_id');
 		sp.set('page', '1');
 
-		await goto(`?${sp.toString()}`, {replaceState: true});
+		await goto(`?${sp.toString()}`, { replaceState: true });
 	}
 
 	function setMonth(offset = 0) {
@@ -308,10 +316,15 @@
 </script>
 
 <div class="mx-auto max-w-[1400px] space-y-6 px-4 py-4">
+	<ClubPageHeader
+		eyebrow="Les rencontres"
+		title="Les matchs font le club."
+		description="Retrouvez les scores, les équipes et les moments qui font la différence."
+	/>
 	<section class="rounded-3xl bg-[hsl(var(--surface-container-low))] p-4 md:p-5">
 		<div class="flex flex-wrap items-center justify-between gap-3">
 			<p class="editorial-kicker">Filtres matchs</p>
-			<div class="flex flex-wrap items-center gap-2">
+			<div class="match-filter-controls flex flex-wrap items-center gap-2">
 				{#if data.players.length > 0}
 					<label
 						class="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
@@ -333,25 +346,22 @@
 					</label>
 				{/if}
 				<Popover.Root>
-					<Popover.Trigger>
-						<Button class="w-[260px] justify-start font-normal" variant="outline">
-							{labelFromRange(range)}
-						</Button>
+					<Popover.Trigger
+						class="inline-flex h-10 max-w-full items-center gap-2 rounded-lg border border-border bg-background px-3 text-left text-sm"
+					>
+						<CalendarDays class="size-4 shrink-0" />
+						{labelFromRange(range)}
 					</Popover.Trigger>
 					<Popover.Content class="p-0">
 						<!-- bind:value fires as the user picks dates;
                              our reactive block above triggers navigation when both ends exist -->
-						<RangeCalendar bind:value={range} class="rounded-md border" />
+						<RangeCalendar bind:value={range} locale="fr-FR" class="rounded-md border" />
 					</Popover.Content>
 				</Popover.Root>
 				<Button onclick={() => setMonth(0)} variant="secondary">Ce mois-ci</Button>
-				<Button onclick={() => setMonth(-1)} variant="ghost">Mois precedent</Button>
-				<Button
-					onclick={clearFilters}
-					variant="ghost"
-					class="border border-destructive/60 text-destructive hover:bg-destructive/10 hover:text-destructive"
-				>
-					Tout effacer
+				<Button onclick={() => setMonth(-1)} variant="ghost">Mois précédent</Button>
+				<Button onclick={clearFilters} variant="ghost" class="gap-2 border border-border">
+					<RotateCcw class="size-4" /> Réinitialiser
 				</Button>
 			</div>
 		</div>
@@ -360,14 +370,14 @@
 	<section class="space-y-6">
 		<div class="flex items-center justify-between px-1">
 			<p class="editorial-kicker">Historique des matchs</p>
-			<p class="text-xs text-muted-foreground">{data.items.length} affiches sur cette page</p>
+			<p class="text-xs text-muted-foreground">{data.items.length} affichés sur cette page</p>
 		</div>
 
 		{#if data.items.length === 0}
 			<div
 				class="rounded-3xl bg-[hsl(var(--surface-container-low))] px-6 py-12 text-center text-sm text-muted-foreground"
 			>
-				Pas de matchs trouves avec les filtres actuels.
+				Pas de matchs trouvés avec les filtres actuels.
 			</div>
 		{:else}
 			{#each groupedMatches as group (group.key)}
@@ -387,12 +397,12 @@
 							{@const team1DeltaRows = teamDeltaRows(game, team1Players)}
 							{@const team2DeltaRows = teamDeltaRows(game, team2Players)}
 							<div
-									class="group rounded-2xl border border-border/65 bg-card/90 px-4 py-4 transition hover:border-border/90"
+								class="club-match-panel group rounded-2xl border border-border/65 bg-card/90 px-4 py-4 transition hover:border-border/90"
 							>
 								<div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-									<div class="overflow-x-auto">
+									<div class="match-history-content">
 										<div
-											class="grid min-w-[640px] grid-cols-[minmax(0,170px)_auto_auto_minmax(0,170px)_auto] items-center gap-x-4"
+											class="match-history-teams grid grid-cols-[minmax(0,170px)_auto_auto_minmax(0,170px)_auto] items-center gap-x-4"
 										>
 											<div class="min-w-0 space-y-1.5">
 												<p class={`editorial-kicker ${outcomeClass(outcome1)}`}>
@@ -450,34 +460,41 @@
 											<p class="uppercase tracking-[0.08em]">Match #{game.id}</p>
 										</div>
 
-										<Button
-											variant="ghost"
-											size="sm"
-											class="rounded-full border border-border/80 px-4 font-semibold text-foreground shadow-none hover:bg-secondary/70"
-											onclick={() => openEditModal(game)}
-											disabled={deletingId === game.id}
-										>
-											Editer
-										</Button>
-										<Button
-											variant="ghost"
-											size="sm"
-											class="rounded-full border border-destructive/60 px-4 font-semibold text-destructive shadow-none hover:bg-destructive/10 hover:text-destructive"
-											onclick={() => handleDeleteMatch(game.id)}
-											disabled={deletingId === game.id}
-										>
-											{deletingId === game.id ? 'Suppression...' : 'Supprimer'}
-										</Button>
+										<details class="match-actions">
+											<summary aria-label="Actions du match" title="Actions du match"
+												><MoreHorizontal size={20} /></summary
+											>
+											<div class="match-actions-menu">
+												<Button
+													variant="ghost"
+													size="sm"
+													class="rounded-full border border-border/80 px-4 font-semibold text-foreground shadow-none hover:bg-secondary/70"
+													onclick={() => openEditModal(game)}
+													disabled={deletingId === game.id}
+												>
+													<Pencil size={14} /> Éditer
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													class="rounded-full border border-destructive/60 px-4 font-semibold text-destructive shadow-none hover:bg-destructive/10 hover:text-destructive"
+													onclick={() => handleDeleteMatch(game.id)}
+													disabled={deletingId === game.id}
+												>
+													<Trash size={14} />
+													{deletingId === game.id ? 'Suppression...' : 'Supprimer'}
+												</Button>
+											</div>
+										</details>
 									</div>
 								</div>
 
-								<div
-										class="grid opacity-0 transition-all duration-200 ease-out [grid-template-rows:0fr] group-focus-within:opacity-100 group-focus-within:[grid-template-rows:1fr] group-hover:opacity-100 group-hover:[grid-template-rows:1fr] motion-reduce:transition-none"
-								>
-									<div class="overflow-hidden">
-										<MatchRatingHoverPanel {game} class="mt-4"/>
+								<details class="match-elo-details">
+									<summary>Détails Elo</summary>
+									<div>
+										<MatchRatingHoverPanel {game} class="mt-4" />
 									</div>
-								</div>
+								</details>
 							</div>
 						{/each}
 					</div>
@@ -487,17 +504,17 @@
 	</section>
 
 	{#if data.pageCount > 1}
-		<section class="rounded-3xl bg-[hsl(var(--surface-container-low))] p-3">
+		<section class="match-pagination rounded-3xl bg-[hsl(var(--surface-container-low))] p-3">
 			<Pagination.Root count={data.pageCount} page={data.page}>
 				<Pagination.Content>
 					<Pagination.Item>
 						<a
 							href={'?' + buildQuery({ page: Math.max(1, data.page - 1) })}
-							aria-label="Page precedente"
+							aria-label="Page précédente"
 							class="rounded-xl px-3 py-2 hover:bg-muted"
 							aria-disabled={data.page === 1}
 						>
-							Precedent
+							<ChevronLeft class="size-4" /><span class="hidden sm:inline">Précédent</span>
 						</a>
 					</Pagination.Item>
 
@@ -526,7 +543,7 @@
 							class="rounded-xl px-3 py-2 hover:bg-muted"
 							aria-disabled={data.page === data.pageCount}
 						>
-							Suivant
+							<span class="hidden sm:inline">Suivant</span><ChevronRight class="size-4" />
 						</a>
 					</Pagination.Item>
 				</Pagination.Content>
@@ -575,7 +592,7 @@
 				<div class="grid grid-cols-2 gap-3">
 					<label class="space-y-1">
 						<span class="text-[11px] uppercase tracking-[0.12em] text-muted-foreground"
-							>Equipe 1</span
+							>Équipe 1</span
 						>
 						<Input
 							type="number"
@@ -588,7 +605,7 @@
 					</label>
 					<label class="space-y-1">
 						<span class="text-[11px] uppercase tracking-[0.12em] text-muted-foreground"
-							>Equipe 2</span
+							>Équipe 2</span
 						>
 						<Input
 							type="number"

@@ -1,21 +1,27 @@
 <script lang="ts">
 	import '../app.css';
-	import {ModeWatcher, mode, toggleMode} from 'mode-watcher';
-	import {onDestroy, onMount} from 'svelte';
+	import ClubMark from '$lib/components/ClubMark.svelte';
+	import { ModeWatcher, mode, toggleMode } from 'mode-watcher';
+	import { onDestroy, onMount } from 'svelte';
 	import Sun from '@lucide/svelte/icons/sun';
 	import Moon from '@lucide/svelte/icons/moon';
 	import KeyRound from '@lucide/svelte/icons/key-round';
 	import X from '@lucide/svelte/icons/x';
-	import {Toaster} from '$lib/components/ui/sonner';
-	import {toast} from 'svelte-sonner';
-	import {navigating, page} from '$app/state';
-	import {afterNavigate, invalidateAll} from '$app/navigation';
+	import Home from '@lucide/svelte/icons/house';
+	import Trophy from '@lucide/svelte/icons/trophy';
+	import History from '@lucide/svelte/icons/history';
+	import Plus from '@lucide/svelte/icons/plus';
+	import Chart from '@lucide/svelte/icons/chart-no-axes-combined';
+	import { Toaster } from '$lib/components/ui/sonner';
+	import { toast } from 'svelte-sonner';
+	import { navigating, page } from '$app/state';
+	import { afterNavigate, invalidateAll } from '$app/navigation';
 	import {
 		getStoredCurrentPlayerId,
 		onCurrentPlayerChange,
 		setStoredCurrentPlayerId
 	} from '$lib/current-player';
-	import {base} from '$app/paths';
+	import { base } from '$app/paths';
 
 	type HeaderPlayer = {
 		id: number;
@@ -29,24 +35,24 @@
 		can_see_names: boolean;
 	};
 
-	let {children, data} = $props<{
+	let { children, data } = $props<{
 		data: { playersLite?: HeaderPlayer[]; privacySession?: NamesPrivacySession };
 	}>();
 
 	const navItems = [
-		{href: '/', label: 'Accueil'},
-		{href: '/leaderboard', label: 'Classement'},
-		{href: '/matches', label: 'Matchs'},
-		{href: '/create', label: 'Nouveau'},
-		{href: '/stats', label: 'Statistiques'}
+		{ href: '/', label: 'Accueil' },
+		{ href: '/leaderboard', label: 'Classement' },
+		{ href: '/matches', label: 'Matchs' },
+		{ href: '/create', label: 'Nouveau' },
+		{ href: '/stats', label: 'Statistiques' }
 	];
 
 	const selectablePlayers = $derived(
-			((data.playersLite ?? []) as HeaderPlayer[])
-					.filter((player: HeaderPlayer) => player.active !== false)
-					.sort((a: HeaderPlayer, b: HeaderPlayer) =>
-							a.player_name.localeCompare(b.player_name, undefined, {sensitivity: 'base'})
-					)
+		((data.playersLite ?? []) as HeaderPlayer[])
+			.filter((player: HeaderPlayer) => player.active !== false)
+			.sort((a: HeaderPlayer, b: HeaderPlayer) =>
+				a.player_name.localeCompare(b.player_name, undefined, { sensitivity: 'base' })
+			)
 	);
 	let mePlayerId = $state('');
 	let pendingWhoAmI = $state('');
@@ -56,7 +62,7 @@
 	let namesPassword = $state('');
 	let savingNamesPassword = $state(false);
 	const isViewingAnonymizedContent = $derived(
-			data.privacySession?.configured === true && data.privacySession.can_see_names === false
+		data.privacySession?.configured === true && data.privacySession.can_see_names === false
 	);
 	$effect(() => {
 		if (!isViewingAnonymizedContent) {
@@ -64,7 +70,7 @@
 		}
 	});
 	const mePlayer = $derived(
-			selectablePlayers.find((player: HeaderPlayer) => String(player.id) === mePlayerId)
+		selectablePlayers.find((player: HeaderPlayer) => String(player.id) === mePlayerId)
 	);
 	const statsHref = $derived(mePlayerId ? `/stats?player_id=${mePlayerId}` : '/stats');
 	const lightFaviconHref = `${base}/foosball_light.png`;
@@ -124,8 +130,8 @@
 		try {
 			const res = await fetch('/api/privacy/names/session', {
 				method: value ? 'POST' : 'DELETE',
-				headers: value ? {'Content-Type': 'application/json'} : undefined,
-				body: value ? JSON.stringify({password: value}) : undefined,
+				headers: value ? { 'Content-Type': 'application/json' } : undefined,
+				body: value ? JSON.stringify({ password: value }) : undefined,
 				credentials: 'include'
 			});
 
@@ -136,9 +142,11 @@
 			await invalidateAll();
 			showNamesPasswordModal = false;
 			namesPassword = '';
-			toast.success(value ? 'Mot de passe enregistre.' : 'Mot de passe retire.');
+			toast.success(value ? 'Mot de passe enregistré.' : 'Mot de passe retiré.');
 		} catch (error) {
-			toast.error(error instanceof Error ? error.message : 'Impossible de valider le mot de passe.');
+			toast.error(
+				error instanceof Error ? error.message : 'Impossible de valider le mot de passe.'
+			);
 		} finally {
 			savingNamesPassword = false;
 		}
@@ -148,7 +156,7 @@
 		if (syncingPrivacySession) return;
 		syncingPrivacySession = true;
 		try {
-			const res = await fetch('/api/privacy/names/session', {credentials: 'include'});
+			const res = await fetch('/api/privacy/names/session', { credentials: 'include' });
 			if (!res.ok) return;
 			const current = (await res.json()) as NamesPrivacySession;
 			if (
@@ -184,8 +192,8 @@
 		const storedString = storedId ? String(storedId) : '';
 
 		if (
-				storedString &&
-				selectablePlayers.some((player: HeaderPlayer) => String(player.id) === storedString)
+			storedString &&
+			selectablePlayers.some((player: HeaderPlayer) => String(player.id) === storedString)
 		) {
 			mePlayerId = storedString;
 			pendingWhoAmI = storedString;
@@ -257,21 +265,21 @@
 	});
 </script>
 
-<header class="bg-background/92 sticky top-0 z-40 backdrop-blur">
+<header class="club-navigation bg-background/92 sticky top-0 z-40 backdrop-blur">
 	<div class="mx-auto max-w-[1400px] px-4 py-4">
 		<nav class="panel-lift flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3">
 			<div class="flex flex-wrap items-center gap-2">
 				<a class="inline-flex items-center gap-2 rounded-xl px-2 py-1.5" href="/">
-					<span class="h-2.5 w-2.5 rounded-full bg-accent"></span>
-					<span class="font-display text-lg font-bold italic text-primary">BabyFoot MyDso</span>
+					<ClubMark />
+					<span class="club-wordmark">BABYFOOT<span>MYDSO · LE CLUB</span></span>
 				</a>
 			</div>
 
-			<div class="flex flex-wrap items-center gap-1">
+			<div class="club-desktop-links flex flex-wrap items-center gap-1">
 				{#each navItems as item (item.href)}
 					<a
-							href={item.href === '/stats' ? statsHref : item.href}
-							class={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
+						href={item.href === '/stats' ? statsHref : item.href}
+						class={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
 							isActive(item.href)
 								? 'bg-primary text-primary-foreground'
 								: 'text-secondary-foreground hover:bg-secondary/70 hover:text-foreground'
@@ -279,8 +287,8 @@
 					>
 						{#if item.href === '/' && isNavigatingToAccueil}
 							<span
-									class="inline-block size-3.5 animate-spin rounded-full border-2 border-current border-r-transparent"
-									aria-hidden="true"
+								class="inline-block size-3.5 animate-spin rounded-full border-2 border-current border-r-transparent"
+								aria-hidden="true"
 							></span>
 						{/if}
 						{item.label}
@@ -292,15 +300,16 @@
 				{#if selectablePlayers.length > 0}
 					<label class="inline-flex items-center gap-2 rounded-xl bg-secondary/65 px-2 py-1.5">
 						<span
-								class="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-						>Moi</span
+							class="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+							>Moi</span
 						>
 						<select
-								bind:value={mePlayerId}
-								class="h-7 rounded-lg border border-border/70 bg-background px-2 text-xs text-foreground"
-								onchange={onMeChange}
+							bind:value={mePlayerId}
+							aria-label="Joueur actuel"
+							class="h-7 rounded-lg border border-border/70 bg-background px-2 text-xs text-foreground"
+							onchange={onMeChange}
 						>
-							<option value="" disabled>Selectionner</option>
+							<option value="" disabled>Sélectionner</option>
 							{#each selectablePlayers as player}
 								<option value={String(player.id)}>{player.player_name}</option>
 							{/each}
@@ -308,25 +317,25 @@
 					</label>
 				{/if}
 				<button
-						aria-label="Definir le mot de passe des noms"
-						class="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-secondary/70 px-3 text-sm font-semibold text-secondary-foreground transition hover:bg-secondary"
-						onclick={() => (showNamesPasswordModal = true)}
-						title="Definir le mot de passe des noms"
-						type="button"
+					aria-label="Accès aux noms"
+					class="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-secondary/70 px-3 text-sm font-semibold text-secondary-foreground transition hover:bg-secondary"
+					onclick={() => (showNamesPasswordModal = true)}
+					title="Accès aux noms"
+					type="button"
 				>
-					<KeyRound class="size-4"/>
+					<KeyRound class="size-4" />
 				</button>
 				<button
-						aria-label={themeToggleLabel()}
-						class="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-secondary/70 px-3 text-sm font-semibold text-secondary-foreground transition hover:bg-secondary"
-						onclick={handleThemeToggle}
-						title={themeToggleLabel()}
-						type="button"
+					aria-label={themeToggleLabel()}
+					class="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-secondary/70 px-3 text-sm font-semibold text-secondary-foreground transition hover:bg-secondary"
+					onclick={handleThemeToggle}
+					title={themeToggleLabel()}
+					type="button"
 				>
 					{#if mode.current === 'dark'}
-						<Sun class="size-4"/>
+						<Sun class="size-4" />
 					{:else}
-						<Moon class="size-4"/>
+						<Moon class="size-4" />
 					{/if}
 				</button>
 			</div>
@@ -334,23 +343,39 @@
 	</div>
 </header>
 
+<nav class="club-mobile-navigation" aria-label="Navigation principale">
+	{#each navItems as item}
+		<a
+			href={item.href === '/stats' ? statsHref : item.href}
+			aria-current={isActive(item.href) ? 'page' : undefined}
+		>
+			{#if item.href === '/'}<Home size={20} />{:else if item.href === '/leaderboard'}<Trophy
+					size={20}
+				/>{:else if item.href === '/matches'}<History
+					size={20}
+				/>{:else if item.href === '/create'}<Plus size={20} />{:else}<Chart size={20} />{/if}
+			<span>{item.label}</span>
+		</a>
+	{/each}
+</nav>
+
 {#if showWhoAmIModal && selectablePlayers.length > 0}
 	<div class="fixed inset-0 z-[120] bg-background/70 backdrop-blur-sm">
 		<div
-				class="mx-auto mt-[12vh] w-[min(92vw,420px)] rounded-2xl border border-border/90 bg-card p-5 shadow-[0_18px_40px_rgba(15,23,42,0.22)]"
+			class="mx-auto mt-[12vh] w-[min(92vw,420px)] rounded-2xl border border-border/90 bg-card p-5 shadow-[0_18px_40px_rgba(15,23,42,0.22)]"
 		>
 			<h2 class="font-display text-2xl font-bold text-foreground">Qui es-tu ?</h2>
 			<p class="mt-1 text-sm text-muted-foreground">
-				Selection obligatoire au premier lancement pour personnaliser tes stats.
+				Choisis ton nom pour retrouver tes statistiques.
 			</p>
 
 			<label class="mt-4 flex flex-col gap-2">
 				<span class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-				>Joueur</span
+					>Joueur</span
 				>
 				<select
-						bind:value={pendingWhoAmI}
-						class="h-10 rounded-xl border border-border/85 bg-background px-3 text-sm text-foreground"
+					bind:value={pendingWhoAmI}
+					class="h-10 rounded-xl border border-border/85 bg-background px-3 text-sm text-foreground"
 				>
 					<option value="" disabled>Choisis ton nom</option>
 					{#each selectablePlayers as player}
@@ -360,10 +385,10 @@
 			</label>
 
 			<button
-					type="button"
-					class="mt-5 inline-flex h-10 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-					onclick={confirmWhoAmISelection}
-					disabled={!pendingWhoAmI}
+				type="button"
+				class="mt-5 inline-flex h-10 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+				onclick={confirmWhoAmISelection}
+				disabled={!pendingWhoAmI}
 			>
 				Continuer
 			</button>
@@ -374,37 +399,37 @@
 {#if showNamesPasswordModal}
 	<div class="fixed inset-0 z-[120] bg-background/70 backdrop-blur-sm">
 		<div
-				class="mx-auto mt-[12vh] w-[min(92vw,420px)] rounded-2xl border border-border/90 bg-card p-5 shadow-[0_18px_40px_rgba(15,23,42,0.22)]"
+			class="mx-auto mt-[12vh] w-[min(92vw,420px)] rounded-2xl border border-border/90 bg-card p-5 shadow-[0_18px_40px_rgba(15,23,42,0.22)]"
 		>
-			<h2 class="font-display text-2xl font-bold text-foreground">Acces aux noms</h2>
+			<h2 class="font-display text-2xl font-bold text-foreground">Accès aux noms</h2>
 			<form class="mt-4 space-y-4" onsubmit={saveNamesPassword}>
 				<label class="flex flex-col gap-2">
 					<span class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-					>Mot de passe</span
+						>Mot de passe</span
 					>
 					<input
-							bind:value={namesPassword}
-							class="h-10 rounded-xl border border-border/85 bg-background px-3 text-sm text-foreground"
-							type="password"
-							autocomplete="current-password"
+						bind:value={namesPassword}
+						class="h-10 rounded-xl border border-border/85 bg-background px-3 text-sm text-foreground"
+						type="password"
+						autocomplete="current-password"
 					/>
 				</label>
 
 				<div class="flex gap-2">
 					<button
-							type="submit"
-							class="inline-flex h-10 flex-1 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-							disabled={savingNamesPassword}
+						type="submit"
+						class="inline-flex h-10 flex-1 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+						disabled={savingNamesPassword}
 					>
 						{savingNamesPassword ? 'Enregistrement...' : 'Enregistrer'}
 					</button>
 					<button
-							type="button"
-							class="inline-flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-secondary/70 text-sm font-semibold text-secondary-foreground transition hover:bg-secondary"
-							onclick={() => {
-								showNamesPasswordModal = false;
-								namesPassword = '';
-							}}
+						type="button"
+						class="inline-flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-secondary/70 text-sm font-semibold text-secondary-foreground transition hover:bg-secondary"
+						onclick={() => {
+							showNamesPasswordModal = false;
+							namesPassword = '';
+						}}
 					>
 						Annuler
 					</button>
@@ -415,43 +440,47 @@
 {/if}
 
 {#if isViewingAnonymizedContent && !dismissedAnonymizedNotice && !showNamesPasswordModal}
-	<div class="fixed bottom-4 left-1/2 z-[110] w-[min(calc(100vw-2rem),460px)] -translate-x-1/2 rounded-2xl border border-border/90 bg-card p-4 shadow-[0_18px_44px_rgba(15,23,42,0.24)]">
+	<div
+		class="club-privacy-notice fixed bottom-4 left-1/2 z-[110] w-[min(calc(100vw-2rem),460px)] -translate-x-1/2 rounded-2xl border border-border/90 bg-card p-4 shadow-[0_18px_44px_rgba(15,23,42,0.24)]"
+	>
 		<div class="flex gap-3">
-			<div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
-				<KeyRound class="size-4"/>
+			<div
+				class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-secondary-foreground"
+			>
+				<KeyRound class="size-4" />
 			</div>
 			<div class="min-w-0 flex-1">
-				<h2 class="text-sm font-semibold text-foreground">Contenu anonymise</h2>
+				<h2 class="text-sm font-semibold text-foreground">Contenu anonymisé</h2>
 				<p class="mt-1 text-sm leading-5 text-muted-foreground">
-					Vous consultez actuellement du contenu anonymise.
+					Vous consultez actuellement du contenu anonymisé.
 				</p>
 				<button
-						type="button"
-						class="mt-3 inline-flex h-9 items-center justify-center rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
-						onclick={() => {
-							showNamesPasswordModal = true;
-							dismissedAnonymizedNotice = true;
-						}}
+					type="button"
+					class="mt-3 inline-flex h-9 items-center justify-center rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+					onclick={() => {
+						showNamesPasswordModal = true;
+						dismissedAnonymizedNotice = true;
+					}}
 				>
 					Entrer le mot de passe
 				</button>
 			</div>
 			<button
-					type="button"
-					aria-label="Fermer"
-					title="Fermer"
-					class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-					onclick={() => (dismissedAnonymizedNotice = true)}
+				type="button"
+				aria-label="Fermer"
+				title="Fermer"
+				class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+				onclick={() => (dismissedAnonymizedNotice = true)}
 			>
-				<X class="size-4"/>
+				<X class="size-4" />
 			</button>
 		</div>
 	</div>
 {/if}
 
-<main class="w-full">
+<main class="w-full" class:club-inner={page.url.pathname !== '/'}>
 	{@render children()}
 </main>
 
-<Toaster offset={toastOffset} position="top-center" richColors/>
+<Toaster offset={toastOffset} position="top-center" richColors />
 <ModeWatcher />

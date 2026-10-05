@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ClubPageHeader from '$lib/components/ClubPageHeader.svelte';
 	import { flip } from 'svelte/animate';
 	import { dndzone, TRIGGERS } from 'svelte-dnd-action';
 	import { onMount } from 'svelte';
@@ -10,6 +11,8 @@
 	import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+	import UserPlus from '@lucide/svelte/icons/user-round-plus';
+	import X from '@lucide/svelte/icons/x';
 	import { getStoredCurrentPlayerId, onCurrentPlayerChange } from '$lib/current-player';
 	import { createGame, deleteGame, getGames } from '$lib/api/matches';
 	import type { GameRead, TeamRead } from '$lib/api/types';
@@ -53,11 +56,8 @@
 		return cutoff.getTime();
 	})();
 	let currentPlayerId = $state<number | null>(null);
-	// A newly created player has no match timestamp and lands in this section.
-	// Open it initially so new players are visible without a hidden extra step.
-	let dormantPlayersExpanded = $state(
-		playersLite.some((player) => player.active !== false && !player.last_game_timestamp)
-	);
+	// Keep players without a récent match collapsed, including those who have never played.
+	let dormantPlayersExpanded = $state(false);
 	let normalizeAvailableColumnsTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function normalizeItem(player: PlayerLite): DndItem {
@@ -112,12 +112,9 @@
 		return [
 			{
 				id: COL_RECENT_PLAYERS,
-				name: 'Joueurs recents',
+				name: 'Joueurs récents',
 				class: 'players',
-				items: activePlayers
-					.filter(isRecentPlayer)
-					.map(normalizeItem)
-					.sort(sortByName)
+				items: activePlayers.filter(isRecentPlayer).map(normalizeItem).sort(sortByName)
 			},
 			{
 				id: COL_DORMANT_PLAYERS,
@@ -263,6 +260,19 @@
 	// scores as $state so updates are reactive
 	let redScore = $state<number | ''>('');
 	let blueScore = $state<number | ''>('');
+	const canSubmit = $derived(
+		columnItems.some((c) => c.id === COL_RED && c.items.length > 0) &&
+			columnItems.some((c) => c.id === COL_BLUE && c.items.length > 0) &&
+			typeof redScore === 'number' &&
+			typeof blueScore === 'number' &&
+			redScore !== blueScore &&
+			Number.isInteger(redScore) &&
+			Number.isInteger(blueScore) &&
+			redScore >= 0 &&
+			redScore <= 10 &&
+			blueScore >= 0 &&
+			blueScore <= 10
+	);
 
 	// backend payload types
 	type TeamCreatePayload = { player_id: number; team_number: 1 | 2 };
@@ -272,7 +282,7 @@
 		teams: TeamCreatePayload[];
 	};
 
-	const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+	const dateTimeFormatter = new Intl.DateTimeFormat('fr-FR', {
 		day: '2-digit',
 		month: 'long',
 		hour: '2-digit',
@@ -484,7 +494,7 @@
 
 			// Show success with Undo action
 			lastGameId = Number.isFinite(Number(data?.id)) ? Number(data.id) : null;
-			toast.success(lastGameId ? `Match #${lastGameId} enregistre !` : 'Match enregistre !', {
+			toast.success(lastGameId ? `Match #${lastGameId} enregistré !` : 'Match enregistré !', {
 				action: {
 					label: 'Annuler',
 					onClick: () => void undoLastSubmission()
@@ -501,20 +511,22 @@
 </script>
 
 <div class="create-match mx-auto max-w-[1400px] space-y-6 px-4 py-4">
+	<ClubPageHeader
+		eyebrow="À vous de jouer"
+		title="Place au prochain match."
+		description="Composez les équipes, jouez la rencontre et enregistrez le score."
+	/>
 	<Card.Root class="create-card create-hero overflow-hidden rounded-3xl">
 		<Card.Header class="relative pb-2">
 			<div
-				class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.1),transparent_50%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_48%)]"
+				class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(127,207,90,0.1),transparent_50%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(127,207,90,0.12),transparent_48%)]"
 			></div>
 			<div class="relative flex flex-wrap items-center justify-between gap-3">
 				<div>
-					<Card.Title class="text-3xl font-black tracking-tight">Créer un match</Card.Title>
+					<Card.Title class="text-3xl font-black tracking-tight">Choisir les joueurs</Card.Title>
 					<Card.Description
 						>Glissez les joueurs dans les équipes rouge et bleue, puis validez le score.</Card.Description
 					>
-					<p class="mt-1 text-xs text-muted-foreground">
-						Astuce : vous pouvez aussi reordonner les joueurs a l'interieur d'une équipe.
-					</p>
 				</div>
 				<div
 					class="rounded-full border border-border/85 bg-background/75 px-3 py-1 text-xs font-medium text-muted-foreground"
@@ -565,12 +577,16 @@
 								<button
 									class="tag-action tag-action-red"
 									title="Envoyer en rouge"
-									onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}>R</button
+									aria-label={`Ajouter ${item.name} à l'équipe rouge`}
+									onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
+									><UserPlus size={16} /></button
 								>
 								<button
 									class="tag-action tag-action-blue"
 									title="Envoyer en bleu"
-									onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}>B</button
+									aria-label={`Ajouter ${item.name} à l'équipe bleue`}
+									onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
+									><UserPlus size={16} /></button
 								>
 							</div>
 						</div>
@@ -588,7 +604,6 @@
 				>
 					<span class="min-w-0">
 						<span class="editorial-kicker block">Sans match depuis 3 mois</span>
-
 					</span>
 					<span class="flex shrink-0 items-center gap-2">
 						<span class="rounded-full bg-card px-2.5 py-0.5 text-xs text-muted-foreground">
@@ -636,12 +651,16 @@
 									<button
 										class="tag-action tag-action-red"
 										title="Envoyer en rouge"
-										onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}>R</button
+										aria-label={`Ajouter ${item.name} à l'équipe rouge`}
+										onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
+										><UserPlus size={16} /></button
 									>
 									<button
 										class="tag-action tag-action-blue"
 										title="Envoyer en bleu"
-										onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}>B</button
+										aria-label={`Ajouter ${item.name} à l'équipe bleue`}
+										onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
+										><UserPlus size={16} /></button
 									>
 								</div>
 							</div>
@@ -652,14 +671,14 @@
 		</Card.Content>
 	</Card.Root>
 
-	<div class="grid items-start gap-4 xl:grid-cols-[1fr_420px_1fr]">
+	<div class="match-setup-grid grid items-start gap-4 xl:grid-cols-[1fr_420px_1fr]">
 		{#each columnItems.filter((c) => c.id === COL_RED) as column (column.id)}
 			<Card.Root class="create-card create-team create-team-red rounded-3xl">
 				<Card.Header class="pb-2">
 					<div class="flex items-center justify-between">
-						<Card.Title class="text-xl">équipe rouge</Card.Title>
+						<Card.Title class="text-xl">Équipe rouge</Card.Title>
 						<span class="tone-team-red rounded-full px-2.5 py-0.5 text-xs">
-							{column.items.length} joueurs
+							{column.items.length} joueur{column.items.length === 1 ? '' : 's'}
 						</span>
 					</div>
 				</Card.Header>
@@ -696,12 +715,16 @@
 									<button
 										class="tag-action tag-action-blue"
 										title="Deplacer en bleu"
-										onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}>B</button
+										aria-label={`Déplacer ${item.name} en bleu`}
+										onclick={withNoDrag(() => moveItemToColumn(item.id, COL_BLUE))}
+										><UserPlus size={16} /></button
 									>
 									<button
 										class="tag-action tag-action-neutral"
 										title="Retour aux joueurs"
-										onclick={withNoDrag(() => moveItemToColumn(item.id, homeColumnIdForItem(item)))}>X</button
+										aria-label={`Retirer ${item.name} de l'équipe rouge`}
+										onclick={withNoDrag(() => moveItemToColumn(item.id, homeColumnIdForItem(item)))}
+										><X size={16} /></button
 									>
 								</div>
 							</div>
@@ -711,6 +734,67 @@
 			</Card.Root>
 		{/each}
 
+		{#each columnItems.filter((c) => c.id === COL_BLUE) as column (column.id)}
+			<Card.Root class="create-card create-team create-team-blue rounded-3xl">
+				<Card.Header class="pb-2">
+					<div class="flex items-center justify-between">
+						<Card.Title class="text-xl">Équipe bleue</Card.Title>
+						<span class="tone-team-blue rounded-full px-2.5 py-0.5 text-xs">
+							{column.items.length} joueur{column.items.length === 1 ? '' : 's'}
+						</span>
+					</div>
+				</Card.Header>
+				<Card.Content>
+					<div
+						class="team-zone team-zone-blue grid max-h-[440px] min-h-[220px] content-start justify-items-center gap-2 overflow-y-auto rounded-2xl p-2"
+						use:dndzone={{
+							items: column.items,
+							type: 'player',
+							flipDurationMs,
+							dropTargetStyle,
+							dropTargetClasses: dropTargetClassesBlue,
+							centreDraggedOnCursor: true,
+							transformDraggedElement
+						}}
+						onconsider={(e) => handleDndConsiderCards(column.id, e)}
+						onfinalize={(e) => handleDndFinalizeCards(column.id, e)}
+					>
+						{#each column.items as item (item.id)}
+							<div
+								animate:flip={{ duration: flipDurationMs }}
+								class={`team-chip team-chip-blue group relative h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl px-3 text-[15px] font-semibold text-foreground transition hover:border-[hsl(var(--team-red)/0.45)] hover:bg-[hsl(var(--team-red-soft)/0.62)] active:cursor-grabbing ${isCurrentPlayer(item) ? 'whoami-chip' : ''}`}
+							>
+								<div class="flex h-full items-center justify-between gap-2">
+									<div class="flex min-w-0 items-center gap-2">
+										<span class="truncate">{item.name}</span>
+									</div>
+									<span class="text-muted-foreground">⠿</span>
+								</div>
+
+								<div
+									class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100"
+								>
+									<button
+										class="tag-action tag-action-red"
+										title="Deplacer en rouge"
+										aria-label={`Déplacer ${item.name} en rouge`}
+										onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}
+										><UserPlus size={16} /></button
+									>
+									<button
+										class="tag-action tag-action-neutral"
+										title="Retour aux joueurs"
+										aria-label={`Retirer ${item.name} de l'équipe bleue`}
+										onclick={withNoDrag(() => moveItemToColumn(item.id, homeColumnIdForItem(item)))}
+										><X size={16} /></button
+									>
+								</div>
+							</div>
+						{/each}
+					</div>
+				</Card.Content>
+			</Card.Root>
+		{/each}
 		<Card.Root class="create-card create-score rounded-3xl">
 			<Card.Header>
 				<Card.Title class="text-xl">Valider le score</Card.Title>
@@ -751,7 +835,7 @@
 				<Button
 					class="h-11 min-w-[170px] rounded-xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
 					onclick={submitScore}
-					disabled={submitting}
+					disabled={submitting || !canSubmit}
 				>
 					{submitting ? 'Envoi...' : 'Envoyer le score'}
 				</Button>
@@ -781,64 +865,6 @@
 				</div>
 			</Card.Footer>
 		</Card.Root>
-
-		{#each columnItems.filter((c) => c.id === COL_BLUE) as column (column.id)}
-			<Card.Root class="create-card create-team create-team-blue rounded-3xl">
-				<Card.Header class="pb-2">
-					<div class="flex items-center justify-between">
-						<Card.Title class="text-xl">équipe bleue</Card.Title>
-						<span class="tone-team-blue rounded-full px-2.5 py-0.5 text-xs">
-							{column.items.length} joueurs
-						</span>
-					</div>
-				</Card.Header>
-				<Card.Content>
-					<div
-						class="team-zone team-zone-blue grid max-h-[440px] min-h-[220px] content-start justify-items-center gap-2 overflow-y-auto rounded-2xl p-2"
-						use:dndzone={{
-							items: column.items,
-							type: 'player',
-							flipDurationMs,
-							dropTargetStyle,
-							dropTargetClasses: dropTargetClassesBlue,
-							centreDraggedOnCursor: true,
-							transformDraggedElement
-						}}
-						onconsider={(e) => handleDndConsiderCards(column.id, e)}
-						onfinalize={(e) => handleDndFinalizeCards(column.id, e)}
-					>
-						{#each column.items as item (item.id)}
-							<div
-								animate:flip={{ duration: flipDurationMs }}
-								class={`team-chip team-chip-blue group relative h-12 w-full max-w-[210px] cursor-grab select-none rounded-xl px-3 text-[15px] font-semibold text-foreground transition hover:border-[hsl(var(--team-red)/0.45)] hover:bg-[hsl(var(--team-red-soft)/0.62)] active:cursor-grabbing ${isCurrentPlayer(item) ? 'whoami-chip' : ''}`}
-							>
-								<div class="flex h-full items-center justify-between gap-2">
-									<div class="flex min-w-0 items-center gap-2">
-										<span class="truncate">{item.name}</span>
-									</div>
-									<span class="text-muted-foreground">⠿</span>
-								</div>
-
-								<div
-									class="absolute inset-y-0 right-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100"
-								>
-									<button
-										class="tag-action tag-action-red"
-										title="Deplacer en rouge"
-										onclick={withNoDrag(() => moveItemToColumn(item.id, COL_RED))}>R</button
-									>
-									<button
-										class="tag-action tag-action-neutral"
-										title="Retour aux joueurs"
-										onclick={withNoDrag(() => moveItemToColumn(item.id, homeColumnIdForItem(item)))}>X</button
-									>
-								</div>
-							</div>
-						{/each}
-					</div>
-				</Card.Content>
-			</Card.Root>
-		{/each}
 	</div>
 </div>
 

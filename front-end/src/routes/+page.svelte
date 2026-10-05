@@ -1,9 +1,7 @@
 <script lang="ts">
-	import {Button} from '$lib/components/ui/button';
-	import {Card, CardContent, CardHeader, CardTitle} from '$lib/components/ui/card';
 	import MatchRatingHoverPanel from '$lib/components/matches/MatchRatingHoverPanel.svelte';
-	import type {GameRead} from '$lib/api/types';
-	import type {LeaderboardRow, Player} from './+page';
+	import type { GameRead } from '$lib/api/types';
+	import type { LeaderboardRow, Player } from './+page';
 
 	export let data: {
 		games: GameRead[];
@@ -13,17 +11,17 @@
 
 	// ——— Helpers for matches, using your actual shape ———
 	const teamPlayers = (g: GameRead, n: 1 | 2): Player[] =>
-			(g?.teams
-					?.filter((t) => t.team_number === n)
-					.map((t) => t.player)
-					.filter((p) => !!p) as Player[] | undefined) ?? [];
+		(g?.teams
+			?.filter((t) => t.team_number === n)
+			.map((t) => t.player)
+			.filter((p) => !!p) as Player[] | undefined) ?? [];
 
 	const nameOf = (p?: Player) => p?.player_name ?? '—';
 	const teamLabel = (g: GameRead, n: 1 | 2) => {
 		const names = teamPlayers(g, n)
-				.map((p) => nameOf(p))
-				.filter((name) => name !== '—');
-		return names.length > 0 ? names.join(' / ') : `Equipe ${n}`;
+			.map((p) => nameOf(p))
+			.filter((name) => name !== '—');
+		return names.length > 0 ? names.join(' / ') : `Équipe ${n}`;
 	};
 
 	const scoreA = (g: GameRead) => g.result_team1 ?? 0;
@@ -44,19 +42,17 @@
 	};
 
 	const outcomeLabel = (outcome: TeamOutcome) =>
-			outcome === 'winner' ? 'Victoire' : outcome === 'defeated' ? 'Défaite' : 'Nul';
+		outcome === 'winner' ? 'Victoire' : outcome === 'defeated' ? 'Défaite' : 'Nul';
 	const outcomeClass = (outcome: TeamOutcome) =>
-			outcome === 'winner'
-					? 'tone-positive'
-					: outcome === 'defeated'
-							? 'tone-negative'
-							: 'text-muted-foreground';
-
-	const scoreClass = (_left: number, _right: number) => 'text-foreground';
+		outcome === 'winner'
+			? 'tone-positive'
+			: outcome === 'defeated'
+				? 'tone-negative'
+				: 'text-muted-foreground';
 
 	const getYearlyDelta = (g: GameRead, playerId: number): number | null => {
 		const change = g.rating_changes?.find(
-				(item) => item.player_id === playerId && item.rating_type === 'yearly'
+			(item) => item.player_id === playerId && item.rating_type === 'yearly'
 		);
 		return typeof change?.delta_mu === 'number' ? change.delta_mu : null;
 	};
@@ -82,8 +78,8 @@
 		const deltas = players.map((player) => getYearlyDelta(g, player.id));
 		const firstNumeric = deltas.find((value): value is number => value !== null);
 		const allSameNumeric =
-				firstNumeric !== undefined &&
-				deltas.every((value) => value !== null && Math.abs(value - firstNumeric) < 1e-9);
+			firstNumeric !== undefined &&
+			deltas.every((value) => value !== null && Math.abs(value - firstNumeric) < 1e-9);
 
 		return deltas.map((delta, index) => {
 			if (allSameNumeric && index > 0) {
@@ -109,258 +105,224 @@
 	};
 
 	const dateDMY = (iso: string) =>
-			new Date(iso).toLocaleDateString(undefined, {
-				day: '2-digit',
-				month: 'short',
-				year: 'numeric'
-			});
+		new Date(iso).toLocaleDateString('fr-FR', {
+			day: '2-digit',
+			month: 'short',
+			year: 'numeric'
+		});
 	const timeHHMM = (iso: string) =>
-			new Date(iso).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+		new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
 	// ——— Helpers for leaderboard ———
 	const rowName = (r: LeaderboardRow) => r?.player_name ?? 'Joueur';
 
 	const rowRating = (r: LeaderboardRow) => r?.mu ?? r?.rating?.mu_monthly;
 	const rowWL = (r: LeaderboardRow) =>
-			`${r.wins ?? 0}-${Math.max(0, (r.games_played ?? 0) - (r.wins ?? 0))}`;
+		`${r.wins ?? 0}-${Math.max(0, (r.games_played ?? 0) - (r.wins ?? 0))}`;
 	const ratingLabel = (r: LeaderboardRow) => {
 		const rating = rowRating(r);
 		return typeof rating === 'number' ? rating.toFixed(1) : '—';
 	};
-	const podiumClass = (idx: number) => {
-		if (idx === 0)
-			return 'bg-[hsl(var(--primary-container))] text-[hsl(var(--primary-container-foreground))]';
-		if (idx === 1) return 'bg-secondary text-secondary-foreground';
-		return 'bg-muted text-muted-foreground';
-	};
 </script>
 
-<div class="mx-auto max-w-[1400px] space-y-6 px-4 py-4">
-	<section
-			class="relative overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,hsl(var(--primary))_0%,hsl(146_79%_24%)_100%)] text-primary-foreground shadow-[0_20px_46px_rgba(0,107,36,0.28)]"
-	>
-		<div
-				class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(85,254,117,0.22),transparent_44%)]"
-		></div>
-		<div class="relative space-y-6 p-7 md:p-10">
-			<div class="space-y-3">
-				<p class="editorial-kicker text-white/75">Tableau de bord</p>
-				<h1 class="font-display text-4xl font-black uppercase tracking-tight sm:text-5xl">
-					Welcome back, champion.
-				</h1>
-				<p class="max-w-2xl text-white/80">
-					Suivez les matchs, l'evolution du classement et les performances des joueurs.
-				</p>
+<svelte:head>
+	<title>BabyFoot MyDso — Le club</title>
+	<meta
+		name="description"
+		content="La vie du club MyDso : derniers matchs de babyfoot, classement mensuel et performances des joueurs."
+	/>
+</svelte:head>
+
+<div class="club-home">
+	<div class="club-eyebrow">
+		<span>MYDSO / LE CLUB DE BABYFOOT</span><span>LE JEU. L’ÉQUIPE. LA REVANCHE.</span>
+	</div>
+	<section class="club-hero" aria-labelledby="club-title">
+		<div class="hero-copy">
+			<p class="club-kicker"><span class="club-dot"></span> La pause devient un sport.</p>
+			<h1 id="club-title">À vous<br />de <em>jouer.</em></h1>
+			<p class="hero-description">
+				Les rivalités se jouent à la table.<br />Les belles victoires restent ici.
+			</p>
+			<div class="hero-actions">
+				<a class="club-button" href="/create">Nouveau match <span aria-hidden="true">↗</span></a>
+				<a class="hero-link" href="/leaderboard">Le classement <span aria-hidden="true">→</span></a>
 			</div>
-			<div class="flex flex-wrap gap-3">
-				<Button class="bg-white text-primary hover:bg-white/90" href="/create" size="lg">
-					Nouveau Match
-				</Button>
-				<Button
-						class="border border-white bg-white/10 text-white hover:bg-white/20 hover:text-white"
-						href="/leaderboard"
-						size="lg"
-						variant="outline"
-				>
-					Voir le Classement
-				</Button>
-			</div>
-			<div class="flex flex-wrap gap-2 text-xs">
-				<span class="bg-white/12 rounded-full px-3 py-1 text-white/80">
-					{data?.games?.length ?? 0} matchs recents
-				</span>
-				<span class="bg-white/12 rounded-full px-3 py-1 text-white/80">
-					{data?.top3?.length ?? 0} meilleurs joueurs ce mois-ci
-				</span>
-			</div>
-			{#if data.lastTenZeroMatch}
-				<span
-						class="bg-white/14 inline-flex max-w-full items-center gap-2 rounded-xl px-3 py-2 text-xs text-white"
-				>
-					<span
-							class="font-semibold uppercase tracking-[0.12em] text-[hsl(var(--primary-container))]"
-					>Derniere Fanny</span
-					>
-					<span class="truncate">
-						{dateDMY(data.lastTenZeroMatch.game_timestamp)}
-						:
-						{teamLabel(data.lastTenZeroMatch, 1)}
-						{data.lastTenZeroMatch.result_team1}-{data.lastTenZeroMatch.result_team2}
-						{teamLabel(data.lastTenZeroMatch, 2)}
-					</span>
-				</span>
-			{:else}
-				<span
-						class="bg-white/12 inline-flex items-center rounded-xl px-3 py-2 text-xs text-white/80"
-				>
-					Aucun match 10-0 enregistre pour le moment.
-				</span>
-			{/if}
+		</div>
+		<div class="hero-art" aria-hidden="true">
+			<div class="club-stamp">MYDSO<span>FOOSBALL CLUB</span></div>
+			<svg viewBox="0 0 520 410" fill="none">
+				<g transform="translate(64 32) rotate(-12 200 180)">
+					<rect x="0" y="15" width="380" height="350" rx="22" fill="#292929" />
+					<rect width="380" height="350" rx="22" fill="#007fb1" stroke="#b3b3b3" stroke-width="2" />
+					<path d="M18 18h344v314H18zM18 175h344" stroke="#cccccc" stroke-width="2" />
+					<circle cx="190" cy="175" r="49" stroke="#cccccc" stroke-width="2" />
+					<path d="M126 18v48h128V18M126 332v-48h128v48" stroke="#cccccc" stroke-width="2" />
+					{#each [91, 250] as y, index}
+						<path d={`M-35 ${y + 5}H412`} stroke="#292929" stroke-width="9" />
+						<path d={`M-35 ${y}H412`} stroke="#cccccc" stroke-width="6" />
+						<rect
+							x={index === 0 ? -48 : 405}
+							y={y - 10}
+							width="28"
+							height="20"
+							rx="5"
+							fill="#e6e6e6"
+						/>
+						{#each [90, 190, 290] as x}
+							<rect
+								x={x - 11}
+								y={y - 12}
+								width="28"
+								height="49"
+								rx="6"
+								fill="#292929"
+								opacity=".4"
+							/>
+							<rect
+								x={x - 15}
+								y={y - 19}
+								width="28"
+								height="46"
+								rx="5"
+								fill={index === 0 ? '#7fcf5a' : '#f2f2f2'}
+							/>
+							<circle cx={x - 1} cy={y - 20} r="13" fill={index === 0 ? '#98d97a' : '#ffffff'} />
+							<path
+								d={`M${x - 8} ${y + 12}h14`}
+								stroke="#007fb1"
+								stroke-opacity=".35"
+								stroke-width="3"
+							/>
+						{/each}
+					{/each}
+					<circle cx="235" cy="186" r="13" fill="#292929" opacity=".5" />
+					<circle cx="232" cy="180" r="12" fill="#7fcf5a" />
+					<circle cx="229" cy="177" r="4" fill="#b2e59b" />
+				</g>
+			</svg>
+			<p>UNE TABLE. DEUX ÉQUIPES. TOUT À JOUER.</p>
 		</div>
 	</section>
 
-	<section class="grid gap-4 xl:grid-cols-[2fr_1fr]">
-		<Card class="overflow-hidden rounded-3xl bg-[hsl(var(--surface-container-low))]">
-			<CardHeader class="flex flex-row items-center justify-between gap-3 pb-2">
-				<CardTitle class="font-display text-3xl font-bold uppercase tracking-tight"
-				>Matchs recents
-				</CardTitle
-				>
-				<Button class="h-8 rounded-lg px-3" href="/matches" variant="ghost">Voir tous</Button>
-			</CardHeader>
-			<CardContent>
-				{#if data?.games?.length}
-					<ul class="space-y-2">
-						{#each data.games as g}
-							{@const outcome1 = teamOutcome(g, 1)}
-							{@const outcome2 = teamOutcome(g, 2)}
-							{@const team1Players = teamPlayers(g, 1)}
-							{@const team2Players = teamPlayers(g, 2)}
-							{@const team1DeltaRows = teamDeltaRows(g, team1Players)}
-							{@const team2DeltaRows = teamDeltaRows(g, team2Players)}
-							<li>
-								<a
-										class="group block rounded-2xl border border-border/65 bg-card/90 px-4 py-4 transition hover:border-border/90"
-										href={`/matches/${g.id}`}
-										aria-label="Ouvrir les details du match"
-								>
-									<div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-										<div class="overflow-x-auto">
-											<div
-													class="grid min-w-[640px] grid-cols-[minmax(0,170px)_auto_auto_minmax(0,170px)_auto] items-center gap-x-4"
-											>
-												<div class="min-w-0 space-y-1.5">
-													<p class={`editorial-kicker ${outcomeClass(outcome1)}`}>
-														{outcomeLabel(outcome1)}
-													</p>
-													{#if team1Players.length}
-														{#each team1Players as p}
-															<p class="truncate text-[1.05rem] font-semibold">{nameOf(p)}</p>
-														{/each}
-													{:else}
-														<p class="truncate text-[1.05rem] text-muted-foreground">Equipe
-															1</p>
-													{/if}
-												</div>
+	<div class="club-ticker">
+		<span class="ticker-label">LA DERNIÈRE FANNY <span aria-hidden="true">↗</span></span>
+		{#if data.lastTenZeroMatch}
+			<a href={`/matches/${data.lastTenZeroMatch.id}`}
+				><span>{teamLabel(data.lastTenZeroMatch, 1)}</span><strong
+					>{scoreA(data.lastTenZeroMatch)} – {scoreB(data.lastTenZeroMatch)}</strong
+				><span>{teamLabel(data.lastTenZeroMatch, 2)}</span><small
+					>{dateDMY(data.lastTenZeroMatch.game_timestamp)}</small
+				></a
+			>
+		{:else}
+			<p>Le prochain 10–0 entrera dans l’histoire du club.</p>
+		{/if}
+	</div>
 
-												<div class="space-y-1.5 pt-5 text-right">
-													{#each team1DeltaRows as row}
-														<p class={`text-[1.05rem] font-semibold tabular-nums ${row.className}`}>
-															{row.text}
-														</p>
-													{/each}
-												</div>
-
-												<div class="min-w-[96px] text-center">
-													<div
-															class="font-display text-[2rem] font-bold tabular-nums leading-none sm:text-[2.2rem]"
-													>
-														<span class={scoreClass(scoreA(g), scoreB(g))}>{scoreA(g)}</span>
-														<span class="mx-1 text-muted-foreground">-</span>
-														<span class={scoreClass(scoreB(g), scoreA(g))}>{scoreB(g)}</span>
-													</div>
-												</div>
-
-												<div class="min-w-0 space-y-1.5">
-													<p class={`editorial-kicker ${outcomeClass(outcome2)}`}>
-														{outcomeLabel(outcome2)}
-													</p>
-													{#if team2Players.length}
-														{#each team2Players as p}
-															<p class="truncate text-[1.05rem] font-semibold">{nameOf(p)}</p>
-														{/each}
-													{:else}
-														<p class="truncate text-[1.05rem] text-muted-foreground">Equipe
-															2</p>
-													{/if}
-												</div>
-
-												<div class="space-y-1.5 pt-5 text-right">
-													{#each team2DeltaRows as row}
-														<p class={`text-[1.05rem] font-semibold tabular-nums ${row.className}`}>
-															{row.text}
-														</p>
-													{/each}
-												</div>
-											</div>
-										</div>
-
-										<div class="flex items-center justify-end gap-3">
-											<div class="text-right text-xs text-muted-foreground">
-												<p class="font-semibold text-foreground/80">{timeHHMM(g.game_timestamp)}</p>
-												<p class="uppercase tracking-[0.08em]">Match #{g.id}</p>
-											</div>
-										</div>
-									</div>
-
-									<div
-											class="grid opacity-0 transition-all duration-200 ease-out [grid-template-rows:0fr] group-focus-within:opacity-100 group-focus-within:[grid-template-rows:1fr] group-hover:opacity-100 group-hover:[grid-template-rows:1fr] motion-reduce:transition-none"
+	<div class="club-dashboard">
+		<section class="match-section" aria-labelledby="récent-title">
+			<div class="section-heading">
+				<div>
+					<p class="club-section-label">AU BORD DU TERRAIN</p>
+					<h2 id="récent-title">Derniers matchs<span>.</span></h2>
+				</div>
+				<a href="/matches">Tous les matchs <span aria-hidden="true">↗</span></a>
+			</div>
+			{#if data?.games?.length}
+				<ul class="club-match-list">
+					{#each data.games as g}
+						<li class="club-match">
+							<a
+								href={`/matches/${g.id}`}
+								aria-label={`Match ${g.id} : ${teamLabel(g, 1)} contre ${teamLabel(g, 2)}`}
+							>
+								<div class="match-meta">
+									<span>MATCH / {String(g.id).padStart(3, '0')}</span><span
+										>{dateDMY(g.game_timestamp)} · {timeHHMM(g.game_timestamp)}</span
 									>
-										<div class="overflow-hidden">
-											<MatchRatingHoverPanel game={g} class="mt-4"/>
+								</div>
+								<div class="match-teams">
+									{#each [1, 2] as team}
+										{@const n = team as 1 | 2}
+										{@const players = teamPlayers(g, n)}
+										{@const deltas = teamDeltaRows(g, players)}
+										<div class:team-right={n === 2} class="match-team">
+											<p class={`outcome ${outcomeClass(teamOutcome(g, n))}`}>
+												{outcomeLabel(teamOutcome(g, n))}
+											</p>
+											{#each players as player, i}<div class="player-line">
+													<span>{nameOf(player)}</span><small class={deltas[i].className}
+														>{deltas[i].text}</small
+													>
+												</div>{:else}<div class="player-line">Équipe {n}</div>{/each}
 										</div>
-									</div>
-								</a>
-							</li>
-						{/each}
-					</ul>
-				{:else}
-					<div class="rounded-2xl bg-card py-10 text-center text-sm text-muted-foreground">
-						Aucun match pour l'instant. Creez-en un.
-					</div>
-				{/if}
-			</CardContent>
-		</Card>
-
-		<Card class="rounded-3xl bg-[hsl(var(--surface-container-low))]">
-			<CardHeader class="pb-2">
-				<CardTitle class="font-display text-2xl font-bold uppercase tracking-tight"
-				>Meilleurs joueurs
-				</CardTitle>
-			</CardHeader>
-			<CardContent>
-				{#if data?.top3?.length}
-					<ol class="space-y-2">
-						{#each data.top3 as row, idx}
-							<li class="rounded-2xl bg-card p-3">
-								<a
-										class="flex items-center justify-between gap-3"
-										href={`/stats?player_id=${row.id}&scope=overall`}
-								>
-									<div class="flex min-w-0 items-center gap-3">
-										<div
-												class="grid h-10 w-10 place-items-center rounded-xl text-sm font-semibold {podiumClass(
-												idx
-											)}"
-										>
-											#{idx + 1}
-										</div>
-										<div class="min-w-0">
-											<p class="truncate font-medium">{rowName(row)}</p>
-											<p class="text-xs text-muted-foreground">V-D : {rowWL(row)}</p>
-										</div>
-									</div>
-									<div class="text-right">
-										<p class="font-semibold tabular-nums">{ratingLabel(row)}</p>
-										<p class="text-xs text-muted-foreground">Elo</p>
-									</div>
-								</a>
-							</li>
-						{/each}
-					</ol>
-
-					<div class="flex justify-end">
-						<Button class="rounded-lg" href="/leaderboard" size="sm" variant="outline"
-						>Classement entier
-						</Button
-						>
-					</div>
-				{:else}
-					<div class="rounded-2xl bg-card py-10 text-center text-sm text-muted-foreground">
-						Pas encore de classement.
-					</div>
-				{/if}
-			</CardContent>
-		</Card>
-	</section>
+										{#if n === 1}<div class="match-score">
+												<span class:winning={winnerTeam(g) === 1}>{scoreA(g)}</span><span
+													class="score-divider">:</span
+												><span class:winning={winnerTeam(g) === 2}>{scoreB(g)}</span>
+											</div>{/if}
+									{/each}
+								</div>
+							</a>
+							<details class="match-ratings">
+								<summary>Évolution des points <span aria-hidden="true">+</span></summary
+								><MatchRatingHoverPanel game={g} class="mt-3" />
+							</details>
+						</li>
+					{/each}
+				</ul>
+			{:else}
+				<div class="club-empty">
+					<span aria-hidden="true">01 /</span>
+					<h3>Tout commence par un match.</h3>
+					<p>La table vous attend. À vous d’écrire le premier score.</p>
+					<a href="/create" class="club-button">Créer un match <span aria-hidden="true">↗</span></a
+					>
+				</div>
+			{/if}
+		</section>
+		<aside class="club-leaderboard" aria-labelledby="leaders-title">
+			<div class="section-heading">
+				<div>
+					<p class="club-section-label">LE PODIUM DU MOIS</p>
+					<h2 id="leaders-title">Le haut du jeu<span>.</span></h2>
+				</div>
+				<span class="podium-symbol" aria-hidden="true">✳</span>
+			</div>
+			{#if data?.top3?.length}
+				<ol>
+					{#each data.top3 as row, idx}<li class:leader={idx === 0}>
+							<a href={`/stats?player_id=${row.id}&scope=monthly`}
+								><span class="rank">0{idx + 1}</span>
+								<div class="rank-player">
+									<strong>{rowName(row)}</strong><small
+										>{row.wins ?? 0} victoires · {rowWL(row)} V–D</small
+									>
+								</div>
+								<div class="rank-rating">
+									<strong>{ratingLabel(row)}</strong><small>ELO</small>
+								</div></a
+							>
+						</li>{/each}
+				</ol>
+			{:else}<div class="podium-empty">
+					<p>La première place est à prendre.</p>
+					<span>Jouez un match pour lancer le classement du mois.</span>
+				</div>{/if}
+			<a class="leaderboard-link" href="/leaderboard"
+				>Explorer le classement <span aria-hidden="true">↗</span></a
+			>
+			<div class="club-note">
+				<span aria-hidden="true">↗</span>
+				<p>Un beau geste.<br />Un bon match.<br /><strong>Et la revanche.</strong></p>
+				<small>L’ESPRIT MYDSO</small>
+			</div>
+		</aside>
+	</div>
+	<footer class="club-footer">
+		<span>BABYFOOT / MYDSO</span><span>Les collègues d’abord. Les adversaires ensuite.</span><a
+			href="/stats">Vos statistiques ↗</a
+		>
+	</footer>
 </div>

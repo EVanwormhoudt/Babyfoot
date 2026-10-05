@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ClubPageHeader from '$lib/components/ClubPageHeader.svelte';
     import {invalidateAll} from '$app/navigation';
     import {toast} from 'svelte-sonner';
     import {Button} from '$lib/components/ui/button';
@@ -109,13 +110,7 @@
 </script>
 
 <section class="mx-auto max-w-[1400px] space-y-6 px-4 py-6">
-    <div class="space-y-2">
-        <p class="editorial-kicker">Gestion Joueurs</p>
-        <h1 class="font-display text-4xl font-black uppercase leading-[0.95]">Atelier joueurs</h1>
-        <p class="text-sm text-muted-foreground">
-            Ajoutez de nouveaux joueurs et modifiez les joueurs existants.
-        </p>
-    </div>
+    <ClubPageHeader eyebrow="Les membres" title="Le club commence ici." description="Retrouvez les joueurs et faites entrer de nouveaux talents sur le terrain." />
 
     <div class="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <Card.Root class="rounded-3xl bg-[hsl(var(--surface-container-low))]">
