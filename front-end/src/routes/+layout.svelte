@@ -73,8 +73,8 @@
 		selectablePlayers.find((player: HeaderPlayer) => String(player.id) === mePlayerId)
 	);
 	const statsHref = $derived(mePlayerId ? `/stats?player_id=${mePlayerId}` : '/stats');
-	const lightFaviconHref = `${base}/foosball_light.png`;
-	const darkFaviconHref = `${base}/foosball.png`;
+	const lightFaviconHref = `${base}/club-favicon.svg`;
+	const darkFaviconHref = `${base}/club-favicon.svg`;
 	let faviconObserver: MutationObserver | null = null;
 	let syncingPrivacySession = false;
 
@@ -265,7 +265,7 @@
 	});
 </script>
 
-<header class="club-navigation bg-background/92 sticky top-0 z-40 backdrop-blur">
+<header class="club-navigation site-header">
 	<div class="mx-auto max-w-[1400px] px-4 py-4">
 		<nav class="panel-lift flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3">
 			<div class="flex flex-wrap items-center gap-2">

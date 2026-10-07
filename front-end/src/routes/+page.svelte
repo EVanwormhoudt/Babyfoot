@@ -1,5 +1,7 @@
 <script lang="ts">
-	import MatchRatingHoverPanel from '$lib/components/matches/MatchRatingHoverPanel.svelte';
+	import PointEvolutionDisclosure from '$lib/components/matches/PointEvolutionDisclosure.svelte';
+	import Trophy from '@lucide/svelte/icons/trophy';
+	import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
 	import type { GameRead } from '$lib/api/types';
 	import type { LeaderboardRow, Player } from './+page';
 
@@ -206,14 +208,14 @@
 	</section>
 
 	<div class="club-ticker">
-		<span class="ticker-label">LA DERNIÈRE FANNY <span aria-hidden="true">↗</span></span>
+		<span class="ticker-label"><Trophy size={22} aria-hidden="true" /> LA DERNIÈRE FANNY</span>
 		{#if data.lastTenZeroMatch}
 			<a href={`/matches/${data.lastTenZeroMatch.id}`}
 				><span>{teamLabel(data.lastTenZeroMatch, 1)}</span><strong
 					>{scoreA(data.lastTenZeroMatch)} – {scoreB(data.lastTenZeroMatch)}</strong
 				><span>{teamLabel(data.lastTenZeroMatch, 2)}</span><small
 					>{dateDMY(data.lastTenZeroMatch.game_timestamp)}</small
-				></a
+				><span class="fanny-match-link">Voir le match <ArrowUpRight size={18} aria-hidden="true" /></span></a
 			>
 		{:else}
 			<p>Le prochain 10–0 entrera dans l’histoire du club.</p>
@@ -265,10 +267,7 @@
 									{/each}
 								</div>
 							</a>
-							<details class="match-ratings">
-								<summary>Évolution des points <span aria-hidden="true">+</span></summary
-								><MatchRatingHoverPanel game={g} class="mt-3" />
-							</details>
+							<PointEvolutionDisclosure game={g} />
 						</li>
 					{/each}
 				</ul>
@@ -286,7 +285,7 @@
 			<div class="section-heading">
 				<div>
 					<p class="club-section-label">LE PODIUM DU MOIS</p>
-					<h2 id="leaders-title">Le haut du jeu<span>.</span></h2>
+					<h2 id="leaders-title">La crème du baby<span>.</span></h2>
 				</div>
 				<span class="podium-symbol" aria-hidden="true">✳</span>
 			</div>
@@ -315,13 +314,13 @@
 			>
 			<div class="club-note">
 				<span aria-hidden="true">↗</span>
-				<p>Un beau geste.<br />Un bon match.<br /><strong>Et la revanche.</strong></p>
+				<p>La fairplitude<br />Un bon match.<br /><strong>Et la revanche.</strong></p>
 				<small>L’ESPRIT MYDSO</small>
 			</div>
 		</aside>
 	</div>
 	<footer class="club-footer">
-		<span>BABYFOOT / MYDSO</span><span>Les collègues d’abord. Les adversaires ensuite.</span><a
+		<span>BABYFOOT / MYDSO</span><span>Mauvaise foi? Regarde la taille du félin plutot</span><a
 			href="/stats">Vos statistiques ↗</a
 		>
 	</footer>

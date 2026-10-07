@@ -20,6 +20,8 @@ export type GameRatingChangeRead = {
     sigma_before: number;
     sigma_after: number;
     delta_mu: number;
+    running_mu_before?: number | null;
+    running_mu_after?: number | null;
 };
 
 export type GameRead = {

@@ -10,7 +10,9 @@ from typing import Iterable
 
 from fastapi import Request
 from starlette.responses import Response
+from sqlmodel import Session
 
+from .ranking.display import add_running_ratings
 from .schemas import GameRead, PlayerLeaderboard, PlayerRead, PlayerStats
 from .settings import settings
 
@@ -161,8 +163,10 @@ def serialize_leaderboard_row(player: object, *, show_names: bool, **extra: obje
     return result.model_copy(update={"player_name": _placeholder_name(result.id)})
 
 
-def serialize_game(game: object, *, show_names: bool) -> GameRead:
+def serialize_game(game: object, *, show_names: bool, session: Session | None = None) -> GameRead:
     result = GameRead.model_validate(game)
+    if session is not None:
+        add_running_ratings([result], session)
     if show_names:
         return result
 
@@ -179,8 +183,11 @@ def serialize_game(game: object, *, show_names: bool) -> GameRead:
     return result.model_copy(update={"teams": masked_teams})
 
 
-def serialize_games(games: Iterable[object], *, show_names: bool) -> list[GameRead]:
-    return [serialize_game(game, show_names=show_names) for game in games]
+def serialize_games(
+        games: Iterable[object], *, show_names: bool, session: Session | None = None,
+) -> list[GameRead]:
+    results = [serialize_game(game, show_names=show_names) for game in games]
+    return add_running_ratings(results, session) if session is not None else results
 
 
 def serialize_player_stats(stats: PlayerStats, *, show_names: bool) -> PlayerStats:

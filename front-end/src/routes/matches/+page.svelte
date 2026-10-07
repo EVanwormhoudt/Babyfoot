@@ -16,7 +16,7 @@
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import { RangeCalendar } from '$lib/components/ui/range-calendar/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
-	import MatchRatingHoverPanel from '$lib/components/matches/MatchRatingHoverPanel.svelte';
+	import PointEvolutionDisclosure from '$lib/components/matches/PointEvolutionDisclosure.svelte';
 	import { deleteGame, updateGame } from '$lib/api/matches';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
@@ -489,12 +489,7 @@
 									</div>
 								</div>
 
-								<details class="match-elo-details">
-									<summary>Détails Elo</summary>
-									<div>
-										<MatchRatingHoverPanel {game} class="mt-4" />
-									</div>
-								</details>
+								<PointEvolutionDisclosure {game} />
 							</div>
 						{/each}
 					</div>

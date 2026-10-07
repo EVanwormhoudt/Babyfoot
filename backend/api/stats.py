@@ -24,9 +24,9 @@ def get_player_games(player_id: int, request: Request, session: Session = Depend
         .options(selectinload(Game.teams).selectinload(Team.player))
         .join(Team, Team.game_id == Game.id)
         .where(Team.player_id == player_id)
-        .order_by(Game.game_timestamp.desc())
+        .order_by(Game.game_timestamp.desc(), Game.id.desc())
     ).all()
-    return serialize_games(games, show_names=can_see_names(request))
+    return serialize_games(games, show_names=can_see_names(request), session=session)
 
 
 @router.get("/{player_id}/stats", response_model=PlayerStats)

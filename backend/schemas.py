@@ -78,6 +78,8 @@ class GamePlayerRatingChangeRead(BaseModel):
     sigma_before: float
     sigma_after: float
     delta_mu: float
+    running_mu_before: float | None = None
+    running_mu_after: float | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

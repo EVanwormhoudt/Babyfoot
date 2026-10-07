@@ -52,6 +52,8 @@ BabyFoot uses a custom team Elo implementation in `backend/ranking/custom_elo.py
 
 Team strength is calculated from the average rating of each team's players. After each match, the backend computes expected win probability, applies a margin-of-victory multiplier, scales the update by team size, and splits the rating delta across teammates. The system maintains separate `overall`, `yearly`, and `monthly` ratings, while storing per-player, per-game rating changes for auditability and UI hover details.
 
+Every match on a given day uses the players' Elo at the end of the previous day to calculate expected win probability. Match deltas accumulate immediately in the current leaderboard, but do not affect the baseline for other matches that day, so changing their order does not change the day's Elo distribution. Days follow the configured `TIMEZONE` (default `Europe/Paris`); monthly and yearly baselines reset to the initial rating at the start of each period. Historical recalculation and rating-history rebuilds use the same daily rule.
+
 ## Statistics And History
 
 The backend exposes player match history, rating history, leaderboard data, and scoped player statistics. Statistics can be filtered by overall, yearly, or monthly periods. Rating history is stored in `players_rating_history`, while immediate current rankings live in `current_player_rank`.

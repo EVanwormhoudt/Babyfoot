@@ -40,6 +40,12 @@ def _same_day_base_snapshot(
         rating_types: list[str],
         day_ts: datetime,
 ) -> dict[tuple[int, str], dict[str, float]]:
+    """Recover yesterday's closing Elo by removing all of today's deltas.
+
+    Current ratings still accumulate each match immediately. This fixed daily
+    baseline keeps match expectations independent of same-day match order.
+    Period rollover runs before this helper, so new periods start at baseline.
+    """
     day_start = day_ts.replace(hour=0, minute=0, second=0, microsecond=0)
     next_day = day_start + timedelta(days=1)
     player_ids = [player.id for player in players]
@@ -113,7 +119,7 @@ def get_games(
         player_game_ids = select(Team.game_id).where(Team.player_id == player_id)
         stmt = stmt.where(Game.id.in_(player_game_ids))
 
-    stmt = stmt.order_by(Game.game_timestamp.desc()).offset(offset).limit(limit)
+    stmt = stmt.order_by(Game.game_timestamp.desc(), Game.id.desc()).offset(offset).limit(limit)
     games = session.exec(stmt).all()
 
     count_stmt = select(func.count()).select_from(Game)
@@ -130,7 +136,7 @@ def get_games(
         player_game_ids = select(Team.game_id).where(Team.player_id == player_id)
         count_stmt = count_stmt.where(Game.id.in_(player_game_ids))
     total_games = session.exec(count_stmt).one()
-    return {"items": serialize_games(games, show_names=can_see_names(request)), "total": total_games}
+    return {"items": serialize_games(games, show_names=can_see_names(request), session=session), "total": total_games}
 
 
 def _validate_game_payload(payload: GameCreate, session: Session) -> Dict[int, Player]:
@@ -292,7 +298,7 @@ def create_game(game: GameCreate, request: Request, session: Session = Depends(g
             .options(selectinload(Game.teams).selectinload(Team.player), selectinload(Game.rating_changes))
             .where(Game.id == new_game.id)
         ).first()
-        return serialize_game(game_full, show_names=True if request is None else can_see_names(request))
+        return serialize_game(game_full, show_names=True if request is None else can_see_names(request), session=session)
     except HTTPException:
         session.rollback()
         raise
@@ -313,7 +319,7 @@ def get_game(game_id: int, request: Request, session: Session = Depends(get_sess
     ).first()
     if not game:
         raise HTTPException(404, "Match introuvable")
-    return serialize_game(game, show_names=can_see_names(request))
+    return serialize_game(game, show_names=can_see_names(request), session=session)
 
 
 @router.put("/{game_id}", response_model=GameRead)
@@ -344,7 +350,7 @@ def update_game(game_id: int, payload: GameUpdate, request: Request, session: Se
         .where(Game.id == game_id)
         .options(selectinload(Game.teams).selectinload(Team.player), selectinload(Game.rating_changes))
     ).first()
-    return serialize_game(updated, show_names=can_see_names(request))
+    return serialize_game(updated, show_names=can_see_names(request), session=session)
 
 
 @router.delete("/{game_id}", status_code=204)
